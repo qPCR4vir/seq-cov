@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.4)
-set (CMAKE_BUILD_TYPE "Release")
+# set (CMAKE_BUILD_TYPE "Release")
 project (seqan3_tutorial CXX)
  
 # add seqan3 to search path
@@ -10,4 +10,13 @@ find_package (seqan3 3.0 REQUIRED)
  
 # build app with seqan3
 add_executable (seq-cov source/seq-cov.cpp)
-target_link_libraries (seq-cov seqan3::seqan3)
+target_link_libraries (seq-cov PUBLIC -static)
+target_link_libraries(seq-cov
+        PUBLIC
+            $<$<CXX_COMPILER_ID:GNU>:-static-libgcc>
+            $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++>
+            
+            $<$<CXX_COMPILER_ID:Clang>:-static-libgcc>
+            $<$<CXX_COMPILER_ID:Clang>:-static-libstdc++>
+            )
+target_link_libraries (seq-cov PUBLIC seqan3::seqan3)
