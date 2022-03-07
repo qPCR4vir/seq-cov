@@ -20,9 +20,9 @@ int main ()
     
     for (auto & record : file_in)
     {
-             if (record.id().starts_with("E|"))        {file_E.push_back(record);++e;}
-        else if (record.id().starts_with("N|"))        {file_N.push_back(record);++n;}
-        else if (record.id().starts_with("Spike|"))    {file_S.push_back(record);++s;}
+             if (record.id().starts_with("E|"))        {file_E.push_back(std::move(record));++e;}
+        else if (record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
+        else if (record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
         if (!(++t & m)) seqan3::debug_stream << "N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
     }
     seqan3::debug_stream << "T= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 

@@ -1,4 +1,5 @@
 cmake_minimum_required (VERSION 3.4)
+set (CMAKE_BUILD_TYPE "Release")
 project (seqan3_tutorial CXX)
  
 # add seqan3 to search path
