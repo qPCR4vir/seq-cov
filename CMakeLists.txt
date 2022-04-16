@@ -1,12 +1,15 @@
-cmake_minimum_required (VERSION 3.4)
+cmake_minimum_required (VERSION 3.12)
 # set (CMAKE_BUILD_TYPE "Release")
-project (seqan3_tutorial CXX)
+project (seq-cov VERSION 0.00.02 LANGUAGES CXX)
  
 # add seqan3 to search path
 list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/build_system")
  
 # require seqan3 with a version between >=3.0.0 and <4.0.0
 find_package (seqan3 3.0 REQUIRED)
+
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana" "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/cmake-nana-build-${CMAKE_BUILD_TYPE}" )
+
  
 # build app with seqan3
 add_executable (seq-cov source/seq-cov.cpp)
@@ -19,4 +22,5 @@ target_link_libraries(seq-cov
             $<$<CXX_COMPILER_ID:Clang>:-static-libgcc>
             $<$<CXX_COMPILER_ID:Clang>:-static-libstdc++>
             )
-target_link_libraries (seq-cov PUBLIC seqan3::seqan3)
+target_link_libraries (seq-cov PUBLIC seqan3::seqan3 nana)
+install(TARGETS seq-cov DESTINATION "bin")
