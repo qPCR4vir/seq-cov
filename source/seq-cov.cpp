@@ -25,67 +25,89 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
     using sequence_container = seqan3::dna15_vector;
 };
  
-void split_fasta(const std::filesystem::path& fasta, std::string gene)
+void split_fasta(const std::filesystem::path& fasta, bool E, bool N, bool S)
 {
-    std::cout << "Going to split: " << fasta.string() << ", gene: " << gene ;
-    return ;
-    /*
+    std::cout << "\nGoing to split: " << fasta.string() << ", gene E: " << E  
+              << ", gene N: " << N << ", gene Spike: " << S   ;
+    
     // Initialise a file input object with a FASTA file.
-    seqan3::sequence_file_input<dna_deg> file_in{base_dir/"allnuc0209.fasta", seqan3::format_fasta{}};
-    seqan3::sequence_file_output<dna_deg> file_E{base_dir/"E.20220209.fasta"};
-    seqan3::sequence_file_output<dna_deg> file_N{base_dir/"N.20220209.fasta"};
-    seqan3::sequence_file_output<dna_deg> file_S{base_dir/"S.20220209.fasta"};
+    seqan3::sequence_file_input file_in{fasta};
+    auto dir=fasta.parent_path();
+    auto name=fasta.filename().string();
+    std::filesystem::path e_fasta = E ? dir / ("E." + name) : std::filesystem::path( "E.fasta");
+    std::filesystem::path n_fasta = N ? dir / ("N." + name) : std::filesystem::path( "N.fasta");
+    std::filesystem::path s_fasta = S ? dir / ("Spike." + name) : std::filesystem::path( "S.fasta");
+    seqan3::sequence_file_output file_E{e_fasta};
+    seqan3::sequence_file_output file_N{n_fasta};
+    seqan3::sequence_file_output file_S{s_fasta};
 
     long e{0L}, n{0L}, s{0L}, t{0L}, m{(1L<<15)-1};
     seqan3::debug_stream << "m= " << m << "\n" ; 
     
     for (auto & record : file_in)
     {
-             if (record.id().starts_with("E|"))        {file_E.push_back(std::move(record));++e;}
-        else if (record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
-        else if (record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
+             if (E && record.id().starts_with("E|"))        {file_E.push_back(std::move(record));++e;}
+        else if (N && record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
+        else if (S && record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
         if (!(++t & m)) seqan3::debug_stream << "N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
     }
     seqan3::debug_stream << "T= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
-    */
+    
 }
+
+class GUI: public nana::form
+{
+    nana::label    input_file_label{*this, "Original fasta file:"};
+    nana::textbox  input_file      {*this};
+    nana::button   set             {*this, "&Select"}, 
+                   run_split       {*this, "S&plit" };
+    nana::group    gene            {*this, "Gene"   };
+public:
+    GUI() : nana::form{nana::api::make_center(1000, 150)}
+    {
+        caption("Split-CoV-fasta. v0.01.00");
+
+        input_file.tip_string("Original fasta file:").multi_lines(false);
+        
+        auto& E = gene.add_option("E");
+        auto& N = gene.add_option("N");
+        auto& S = gene.add_option("Spike");
+
+        run_split.events().click([&]()
+        {
+            split_fasta(input_file.text(), E.checked(), N.checked(), S.checked());
+        });
+
+        set.events().click([&]()
+        {
+            nana::filebox fb{*this, true};
+            fb.title("Select the original GISAID CoV fasta file");
+            fb.add_filter("fasta file", "*.fasta");
+            const auto&files = fb.show();
+            if (!files.empty())
+            input_file.reset(files[0].string());
+        });
+
+        auto& p = get_place();
+        p.div(R"(<width=100 gene><vertical  <height=30 input arrange=[variable,60]> 
+                                            <height=30 file >
+                                            <height=30 split arrange=[40] gap=10> 
+                                            margin=10
+                                            min=300>   
+            )");
+        p["gene"]  << gene ;
+        p["input"] << input_file_label << set ;
+        p["file"]  << input_file ;
+        p["split"] << run_split ;
+        p.collocate();
+    };
+};
 
 int main (int argc, char ** argv)
 {
     seqan3::argument_parser arg_parser{"Split-CoV-fasta", argc, argv}; 
-    std::filesystem::path base_dir{"D:/PMS/CoV"}; // get the directory
-    // seqan3::debug_stream <<1<< base_dir<<"\n";
     
-    nana::form fm{nana::api::make_center(1000, 200)};
-    fm.caption("Split-CoV-fasta");
-    nana::label input_file_label{fm, "Original fasta file:"};
-    nana::textbox input_file{fm};
-    input_file.tip_string("Original fasta file:");
-    nana::combox gene{fm};
-    gene.push_back("E").push_back("N").push_back("Spike");
-    nana::button set{fm, "&Set"}, 
-                 run_split{fm, "&Split"};
-    run_split.events().click([&](){split_fasta(input_file.text(), gene.caption());});
-    set.events().click([&]()
-    {
-        nana::filebox fb{fm, true};
-        fb.title("Select the original GISAID CoV fasta file");
-        fb.add_filter("fasta file", "*.fasta");
-        const auto&files = fb.show();
-        if (!files.empty())
-           input_file.reset(files[0].string());
-    });
-    auto& p = fm.get_place();
-    p.div(R"(vertical  <height=30 input arrange=[120,variable,40]> 
-                       <height=10 >
-                       <height=30 split arrange=[100,80,40] gap=10> 
-                       margin=10)");
-    p["input"] << input_file_label << input_file << set ;
-    p["split"] << "Select the gene: " << gene << run_split ;
-    p.collocate();
-
-
-
+    GUI fm;
     fm.show();
     nana::exec();
     return 0;
