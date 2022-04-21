@@ -95,35 +95,40 @@ public:
         // Initialise a file input object with a FASTA file.
         seqan3::sequence_file_input file_in{fasta};
 
-        std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
-        std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
-        std::filesystem::path s_fasta = split_S ? dir / ("Spike." + fasta_name) : std::filesystem::path( "S.fasta");
-        seqan3::sequence_file_output file_E{e_fasta};
-        seqan3::sequence_file_output file_N{n_fasta};
-        seqan3::sequence_file_output file_S{s_fasta};
-
         long e{0L}, n{0L}, s{0L}, t{0L}, m{(1L<<15)-1};
         seqan3::debug_stream << "m= " << m << "\n" ; 
 
         using seq_t = decltype(file_in)::sequence_type;
         using id_t = decltype(file_in)::id_type;
         std::unordered_multimap<seq_t, id_t> e_grouped;
-        
-        for (auto & record : file_in)
         {
-                if (split_E && record.id().starts_with("E|"))        
-                {   
-                    e_grouped.emplace(std::make_pair(record.sequence(), record.id()));
-                    file_E.push_back(std::move(record));++e;
-                        
-                }
-            else if (split_N && record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
-            else if (split_S && record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
-            if (!(++t & m)) 
-                seqan3::debug_stream << "T= " << t << "N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
-            if (t>1000000) break;
+            std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
+            std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
+            std::filesystem::path s_fasta = split_S ? dir / ("Spike." + fasta_name) : std::filesystem::path( "S.fasta");
+            seqan3::sequence_file_output file_E{e_fasta};
+            seqan3::sequence_file_output file_N{n_fasta};
+            seqan3::sequence_file_output file_S{s_fasta};
+
+            for (auto & record : file_in)
+            {
+                    if (split_E && record.id().starts_with("E|"))        
+                    {   
+                        e_grouped.emplace(std::make_pair(record.sequence(), record.id()));
+                        //seqan3::debug_stream << record.sequence() << "\n" ;
+                        file_E.push_back(std::move(record));++e;
+                            
+                    }
+                else if (split_N && record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
+                else if (split_S && record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
+                if (!(++t & m)) 
+                    seqan3::debug_stream << "T= " << t << ", N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
+                if (t>100000) break;
+            }
         }
-        seqan3::debug_stream << "T= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
+        seqan3::debug_stream << "Total= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << " sequences into " << e_grouped.bucket_count() << " groups\n" ; 
+        std::filesystem::path e_gr = split_E ? dir / ("E.gr" + fasta_name) : std::filesystem::path( "E.fasta");
+        seqan3::sequence_file_output file_e_gr{e_gr};
+
     }
     void set_e_forw(const std::string& pr)
     {
