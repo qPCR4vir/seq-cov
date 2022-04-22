@@ -1,5 +1,7 @@
 #include <string>
+#include <vector>
 #include <filesystem>
+//#include <algorithm>
 #include <unordered_map>
 //#include <ranges>
  
@@ -13,6 +15,9 @@
 #include <seqan3/alphabet/hash.hpp>
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/std/ranges>
+#include <seqan3/alignment/configuration/align_config_method.hpp>
+#include <seqan3/alignment/pairwise/align_pairwise.hpp>
+#include <seqan3/alignment/configuration/align_config_edit.hpp>
 
 #include <nana/gui.hpp>
 #include <nana/gui/widgets/button.hpp>
@@ -72,14 +77,22 @@ struct hash<urng_t>
         return result;
     }
 };
-
 } // namespace std
+
+struct SeqGr
+{
+    int count{0};
+    int beg, end;
+};
+
 class SplitCoVfasta
 {
     std::filesystem::path fasta, dir;
     std::string fasta_name;
     bool split_E, split_N, split_S;
-    seqan3::dna5_vector e_forw, e_rev, n_forw, n_rev, s_forw, s_rev;    
+    seqan3::dna5_vector e_forw, e_rev, n_forw, n_rev, s_forw, s_rev;   
+    int e_beg{0}, e_end{0}, e_len{0}; 
+
 
 public:
     SplitCoVfasta(const std::filesystem::path& fasta, bool split_E, bool split_N, bool split_S)
@@ -100,7 +113,7 @@ public:
 
         using seq_t = decltype(file_in)::sequence_type;
         using id_t = decltype(file_in)::id_type;
-        std::unordered_multimap<seq_t, id_t> e_grouped;
+        std::unordered_map<seq_t, SeqGr > e_grouped;
         {
             std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
             std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
@@ -111,24 +124,93 @@ public:
 
             for (auto & record : file_in)
             {
-                    if (split_E && record.id().starts_with("E|"))        
-                    {   
-                        e_grouped.emplace(std::make_pair(record.sequence(), record.id()));
-                        //seqan3::debug_stream << record.sequence() << "\n" ;
-                        file_E.push_back(std::move(record));++e;
-                            
+                const seqan3::dna5_vector &sq = record.sequence();
+                if (split_E && record.id().starts_with("E|"))        
+                {   
+                    auto bg = sq.begin()+e_beg;
+                    auto en = sq.begin()+e_end;
+                    SeqGr& sg = e_grouped[seqan3::dna5_vector{bg, en}];
+                    if (!sg.count++) 
+                    {
+                        seqan3::debug_stream << "\n"  <<  seqan3::dna5_vector{bg, en} << "\n" ;
+
+                        set_seq_pos(sq, sg);
+                        if (bg == en) 
+                        {
+                            e_grouped.erase(seqan3::dna5_vector{bg, en});
+                            bg = sq.begin()+e_beg;
+                            en = sq.begin()+e_end;
+                            SeqGr& sgr = e_grouped[seqan3::dna5_vector{bg, en}];
+                            sgr=sg;
+                            seqan3::debug_stream << seqan3::dna5_vector{bg, en} << "\n" ; 
+                        }
+                        if (e_beg > sg.beg || sg.end > e_end) 
+                        {    
+                            e_grouped.erase(seqan3::dna5_vector{bg, en});
+                            SeqGr& sgr = e_grouped[seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}];
+                            sgr.count++;
+                            sgr.beg = 0;
+                            sgr.end = e_len;
+                            seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
+                        }
                     }
+                    file_E.push_back(std::move(record));++e;
+                }
                 else if (split_N && record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
                 else if (split_S && record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
                 if (!(++t & m)) 
-                    seqan3::debug_stream << "T= " << t << ", N= " << n << ", E= " << e << ", Spike= " << s << "\n" ; 
-                if (t>100000) break;
+                    seqan3::debug_stream << "\tT= " << t << ", N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << "\n" ; 
+                if (t>300000) break;
             }
         }
-        seqan3::debug_stream << "Total= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << " sequences into " << e_grouped.bucket_count() << " groups\n" ; 
+        seqan3::debug_stream << "Total= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << "\n" ; 
         std::filesystem::path e_gr = split_E ? dir / ("E.gr" + fasta_name) : std::filesystem::path( "E.fasta");
         seqan3::sequence_file_output file_e_gr{e_gr};
 
+    }
+    void set_seq_pos(const seqan3::dna5_vector& s, SeqGr& sg)
+    {
+        auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
+                             seqan3::align_cfg::output_end_position{} | seqan3::align_cfg::output_alignment{};
+        auto method = seqan3::align_cfg::method_local{};
+        seqan3::align_cfg::scoring_scheme scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, seqan3::mismatch_score{-1}}};
+        seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
+        auto config = method | scheme | gap_costs | output_config;
+
+        /*
+        auto config = seqan3::align_cfg::method_global{
+                seqan3::align_cfg::free_end_gaps_sequence1_leading{false},    // target seq
+                seqan3::align_cfg::free_end_gaps_sequence2_leading{true},     // primer
+                seqan3::align_cfg::free_end_gaps_sequence1_trailing{false},   // target seq
+                seqan3::align_cfg::free_end_gaps_sequence2_trailing{true}};   // primer
+        */
+        
+        auto results = seqan3::align_pairwise(std::tie(s, e_forw), config);
+        auto & res = *results.begin();
+        seqan3::debug_stream << "Score: " << res.score() ;
+        seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+        seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
+                             << "Alignment: " << res.alignment();
+        sg.count += 1;
+        sg.beg = res.sequence1_begin_position() - e_beg;
+        if (!e_end)
+        {
+            e_beg = res.sequence1_begin_position(); 
+            if (e_beg < 20)
+                e_beg = 0;
+            else 
+                e_beg = e_beg - 20 ;
+            sg.beg = res.sequence1_begin_position() - e_beg;
+            auto res_rev = seqan3::align_pairwise(std::tie(s, e_rev), config);
+            auto & res_r = *res_rev.begin();
+            seqan3::debug_stream << "Score: " << res_r.score() ;
+            seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
+                             << "Alignment: " << res_r.alignment();
+            e_end = res_r.sequence1_end_position() + 20 ;
+            e_len = res_r.sequence1_end_position() - res.sequence1_begin_position() + 1 ;
+        }
+        sg.end = sg.beg + e_len;
     }
     void set_e_forw(const std::string& pr)
     {
