@@ -92,11 +92,29 @@ class SplitCoVfasta
     using sequence_type = seqan3::dna5_vector;
     struct SplitGene
     {
+        SplitCoVfasta const &parent;
         bool          split;
+        std::sting    gene;
+        
         sequence_type forw, rev, target; 
         int           beg{0}, end{0}, len{0}, count{0}; 
         std::sting    start;
         std::unordered_map<sequence_type, SeqGr> grouped; 
+        seqan3::sequence_file_output file_E;   // todo implement conditional split
+        
+        SplitGene(SplitCoVfasta const *parent, std::string gene, bool split)
+        : parent{*parent}, 
+          gene{gene}, 
+          split{split}, 
+          start{gene+"|"},
+          file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};
+        {
+            //if (split) file_E.open( );  // todo implement conditional split
+            std::cout << std::boolalpha  
+                << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
+                << ", gene " << gene <<": " << split << " into "
+                << (parent.dir / (gene + "." + parent.fasta_name)).string();
+        }
         bool check(auto& record)
         {
             if (!split_e.split) return false;
@@ -159,51 +177,51 @@ class SplitCoVfasta
             }
             return true;
         }
-    void set_seq_pos(const seqan3::dna5_vector& s, SeqGr& sg)
-    {
-        auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
-                             seqan3::align_cfg::output_end_position{} | seqan3::align_cfg::output_alignment{};
-        auto method = seqan3::align_cfg::method_local{};
-        seqan3::align_cfg::scoring_scheme scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, seqan3::mismatch_score{-1}}};
-        seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
-        auto config = method | scheme | gap_costs | output_config;
-
-        /*
-        auto config = seqan3::align_cfg::method_global{
-                seqan3::align_cfg::free_end_gaps_sequence1_leading{false},    // target seq
-                seqan3::align_cfg::free_end_gaps_sequence2_leading{true},     // primer
-                seqan3::align_cfg::free_end_gaps_sequence1_trailing{false},   // target seq
-                seqan3::align_cfg::free_end_gaps_sequence2_trailing{true}};   // primer
-        */
-        
-        auto results = seqan3::align_pairwise(std::tie(s, e_forw), config);
-        auto & res = *results.begin();
-        seqan3::debug_stream << "Score: " << res.score() ;
-        seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-        seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
-                             << "Alignment: " << res.alignment();
-        sg.count += 1;
-        sg.beg = res.sequence1_begin_position() - e_beg;
-        if (!e_end)
+        void set_seq_pos(const seqan3::dna5_vector& s, SeqGr& sg)
         {
-            e_beg = res.sequence1_begin_position(); 
-            if (e_beg < 20)
-                e_beg = 0;
-            else 
-                e_beg = e_beg - 20 ;
-            sg.beg = res.sequence1_begin_position() - e_beg;
-            auto res_rev = seqan3::align_pairwise(std::tie(s, e_rev), config);
-            auto & res_r = *res_rev.begin();
-            seqan3::debug_stream << "Score: " << res_r.score() ;
-            seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
-                             << "Alignment: " << res_r.alignment();
-            e_end = res_r.sequence1_end_position() + 20 ;
-            e_len = res_r.sequence1_end_position() - res.sequence1_begin_position() + 1 ;
+            auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
+                                 seqan3::align_cfg::output_end_position{} | seqan3::align_cfg::output_alignment{};
+            auto method = seqan3::align_cfg::method_local{};
+            seqan3::align_cfg::scoring_scheme scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, seqan3::mismatch_score{-1}}};
+            seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
+            auto config = method | scheme | gap_costs | output_config;
+
+            /*
+            auto config = seqan3::align_cfg::method_global{
+                    seqan3::align_cfg::free_end_gaps_sequence1_leading{false},    // target seq
+                    seqan3::align_cfg::free_end_gaps_sequence2_leading{true},     // primer
+                    seqan3::align_cfg::free_end_gaps_sequence1_trailing{false},   // target seq
+                    seqan3::align_cfg::free_end_gaps_sequence2_trailing{true}};   // primer
+            */
+            
+            auto results = seqan3::align_pairwise(std::tie(s, forw), config);
+            auto & res = *results.begin();
+            seqan3::debug_stream << "Score: "     << res.score() ;
+            seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+            seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
+                                 << "Alignment: " << res.alignment();
+            sg.count += 1;
+            sg.beg = res.sequence1_begin_position() - beg;
+            if (!end)
+            {
+                beg = res.sequence1_begin_position(); 
+                if (beg < 20)
+                    beg = 0;
+                else 
+                    beg = beg - 20 ;
+                sg.beg = res.sequence1_begin_position() - beg;
+                auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
+                auto & res_r = *res_rev.begin();
+                seqan3::debug_stream << "Score: " << res_r.score() ;
+                seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+                seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
+                                << "Alignment: " << res_r.alignment();
+                end = res_r.sequence1_end_position() + 20 ;
+                len = res_r.sequence1_end_position() - res.sequence1_begin_position() + 1 ;
+            }
+            sg.end = sg.beg + len;
+            if ()
         }
-        sg.end = sg.beg + e_len;
-        if ()
-    }
         void write_grouped (std::filesystem::path& const dir, std::string& const fasta_name)
         {
             if (!split) return;
@@ -212,40 +230,39 @@ class SplitCoVfasta
 
         }
         
-    void set_e_forw(const std::string& pr)
-    {
-         e_forw.clear();
-         auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
-         e_forw = seqan3::dna5_vector{e.begin(), e.end()}; 
-         seqan3::debug_stream << "\n from " << pr << " e_forw: " << e_forw;
-    }
-    void set_e_rev(const std::string& pr)
-    {
-         auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
-         e_rev = seqan3::dna5_vector{e.begin(), e.end()}; 
-         seqan3::debug_stream  << " from " << pr << ", e_rev: " << e_rev;
-    }
+        SplitGene& set_forw(const std::string& pr)
+        {
+            if (pr.empty()) return *this;
+            auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
+            forw = seqan3::dna5_vector{e.begin(), e.end()}; 
+            seqan3::debug_stream << "\n from " << pr << ", forw: " << forw;
+            return *this;
+        }
+        void set_rev(const std::string& pr)
+        {
+            if (pr.empty()) return *this;
+            auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
+            rev = seqan3::dna5_vector{e.begin(), e.end()}; 
+            seqan3::debug_stream  << " from " << pr << ", rev: " << rev;
+            return *this;
+        }
 
     };    
-    std::filesystem::path fasta, dir;
-    std::string fasta_name;
-    SplitGene split_e, split_n, split_s;
+    std::filesystem::path fasta;
+    std::filesystem::path dir       {fasta.parent_path()};
+    std::string           fasta_name{fasta.filename().string()};
+    std::vector<SplitGene> genes;
 
 public:
-    SplitCoVfasta(const std::filesystem::path& fasta, bool split_E, bool split_N, bool split_S)
-    : fasta{fasta}, dir{fasta.parent_path()}, fasta_name{fasta.filename().string()}
-    {
-        std::cout << std::boolalpha  << "\nGoing to split: " << fasta.string() 
-                << ", gene E: " << split_E  
-                << ", gene N: " << split_N << ", gene Spike: " << split_S   ;
-        split_e.split = split_E; 
-        split_n.split = split_N;
-        split_s.split = split_S;
+    SplitCoVfasta(const std::filesystem::path& fasta)
+    : fasta{fasta}
+    {}
 
-        split_e.start = "E|"; 
-        split_n.start = "N|";
-        split_s.start = "Spike|";
-    
+    void add_gene(std::string gene, bool split, std::string fw="", std::string rv="")  // todo implement conditional split
+    {
+        genes.emplace_back(this, gene, split).set_forw(fw)
+                                             .set_rev (rv);
+
     }
     void split_fasta( )
     {
@@ -285,27 +302,6 @@ public:
         
 
     }
-
-    void set_e_forw(const std::string& pr)
-    {
-         split_e.set_e_forw(pr);
-         seqan3::debug_stream << "\n from " << pr << " e_forw: " << split_e.forw;
-    }
-    void set_e_rev(const std::string& pr)
-    {
-         split_e.set_e_rev(pr);
-         seqan3::debug_stream  << " from " << pr << ", e_rev: " << split_e.rev;
-    }
-    void set_n_forw(const std::string& pr)
-    {
-         split_n.set_e_forw(pr);
-         seqan3::debug_stream << "\n from " << pr << " n_forw: " << split_n.forw;
-    }
-    void set_n_rev(const std::string& pr)
-    {
-         split_n.set_e_rev(pr);
-         seqan3::debug_stream  << " from " << pr << ", e_rev: " << split_n.rev;
-    }
 };
  
 
@@ -341,9 +337,19 @@ public:
 
         run_split.events().click([&]()
         {
-            SplitCoVfasta sp{input_file.text(), E.checked(), N.checked(), S.checked()};
-            sp.set_e_forw(e_forw_tb.text());
-            sp.set_e_rev(e_rev_tb.text());
+            std::filesystem::path fasta{input_file.text()};
+            if (!fasta.is_regular()) return;  // todo msg
+
+            SplitCoVfasta sp{};
+
+            // todo implement conditional split
+            if (E.checked()) 
+                sp.add_gene("E", E.checked(), e_forw_tb.text(), e_rev_tb.text())
+            if (N.checked())  
+                sp.add_gene("N", N.checked(), n_forw_tb.text(), n_rev_tb.text())
+            if (S.checked()) 
+                sp.add_gene("Spike", S.checked(), s_forw_tb.text(), s_rev_tb.text())
+
             sp.split_fasta();
         });
 
