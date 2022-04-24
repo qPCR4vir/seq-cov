@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include <vector>
 #include <filesystem>
 //#include <algorithm>
@@ -83,91 +84,81 @@ struct SeqGr
 {
     int count{0};
     int beg, end;
+    std::string id;
 };
 
 class SplitCoVfasta
 {
-    std::filesystem::path fasta, dir;
-    std::string fasta_name;
-    bool split_E, split_N, split_S;
-    seqan3::dna5_vector e_forw, e_rev, n_forw, n_rev, s_forw, s_rev;   
-    int e_beg{0}, e_end{0}, e_len{0}; 
-
-
-public:
-    SplitCoVfasta(const std::filesystem::path& fasta, bool split_E, bool split_N, bool split_S)
-    : fasta{fasta}, split_E{split_E}, split_N{split_N}, split_S{split_S}, dir{fasta.parent_path()}, fasta_name{fasta.filename().string()}
+    using sequence_type = seqan3::dna5_vector;
+    struct SplitGene
     {
-    std::cout << "\nGoing to split: " << fasta.string() << ", gene E: " << split_E  
-              << ", gene N: " << split_N << ", gene Spike: " << split_S   ;
-    
-    }
-    void split_fasta( )
-    {
-
-        // Initialise a file input object with a FASTA file.
-        seqan3::sequence_file_input file_in{fasta};
-
-        long e{0L}, n{0L}, s{0L}, t{0L}, m{(1L<<15)-1};
-        seqan3::debug_stream << "m= " << m << "\n" ; 
-
-        using seq_t = decltype(file_in)::sequence_type;
-        using id_t = decltype(file_in)::id_type;
-        std::unordered_map<seq_t, SeqGr > e_grouped;
+        bool          split;
+        sequence_type forw, rev, target; 
+        int           beg{0}, end{0}, len{0}, count{0}; 
+        std::sting    start;
+        std::unordered_map<sequence_type, SeqGr> grouped; 
+        bool check(auto& record)
         {
-            std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
-            std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
-            std::filesystem::path s_fasta = split_S ? dir / ("Spike." + fasta_name) : std::filesystem::path( "S.fasta");
-            seqan3::sequence_file_output file_E{e_fasta};
-            seqan3::sequence_file_output file_N{n_fasta};
-            seqan3::sequence_file_output file_S{s_fasta};
+            if (!split_e.split) return false;
+            if (!record.id().starts_with(start)) return false;
+            count++;
+            const seqan3::dna5_vector &sq = record.sequence();
+            int lend= end > sq.size() ? sq.size() : end;
+            int lbeg= lend - len < beg ? (lend - len < 0 ? 0 : lend - len) : beg ;
 
-            for (auto & record : file_in)
+            auto bg = sq.begin()+lbeg;
+            auto en = sq.begin()+lend;
+            SeqGr& sg = grouped[seqan3::dna5_vector{bg, en}];  // first try
+            if (sg.count++) return true; // duplicate seq. More than 99% of cases.
+            
+            // new, unknown seq.
+            seqan3::debug_stream << "\n"  <<  seqan3::dna5_vector{bg, en} << "\n" ;
+            sg.id = record.id();
+            set_seq_pos(sq, sg);  // true align to correct position 
+            
+            if (bg == en) // this is the first seq
             {
-                const seqan3::dna5_vector &sq = record.sequence();
-                if (split_E && record.id().starts_with("E|"))        
-                {   
-                    auto bg = sq.begin()+e_beg;
-                    auto en = sq.begin()+e_end;
-                    SeqGr& sg = e_grouped[seqan3::dna5_vector{bg, en}];
-                    if (!sg.count++) 
-                    {
-                        seqan3::debug_stream << "\n"  <<  seqan3::dna5_vector{bg, en} << "\n" ;
-
-                        set_seq_pos(sq, sg);
-                        if (bg == en) 
-                        {
-                            e_grouped.erase(seqan3::dna5_vector{bg, en});
-                            bg = sq.begin()+e_beg;
-                            en = sq.begin()+e_end;
-                            SeqGr& sgr = e_grouped[seqan3::dna5_vector{bg, en}];
-                            sgr=sg;
-                            seqan3::debug_stream << seqan3::dna5_vector{bg, en} << "\n" ; 
-                        }
-                        if (e_beg > sg.beg || sg.end > e_end) 
-                        {    
-                            e_grouped.erase(seqan3::dna5_vector{bg, en});
-                            SeqGr& sgr = e_grouped[seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}];
-                            sgr.count++;
-                            sgr.beg = 0;
-                            sgr.end = e_len;
-                            seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
-                        }
-                    }
-                    file_E.push_back(std::move(record));++e;
-                }
-                else if (split_N && record.id().starts_with("N|"))        {file_N.push_back(std::move(record));++n;}
-                else if (split_S && record.id().starts_with("Spike|"))    {file_S.push_back(std::move(record));++s;}
-                if (!(++t & m)) 
-                    seqan3::debug_stream << "\tT= " << t << ", N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << "\n" ; 
-                if (t>300000) break;
+                grouped.erase(seqan3::dna5_vector{bg, en});
+                bg = sq.begin()+beg;
+                en = sq.begin()+end;
+                target = seqan3::dna5_vector{bg, en};
+                grouped[target] = sg;
+                // todo what if incomplete ??
+                // todo make sure this first target-sequence is correct !!!!
+                // this will be the "standart" target-sequence
+                
+                seqan3::debug_stream << "\nTarget sequence: " << start << target << "\n" ; 
+                return true; 
             }
-        }
-        seqan3::debug_stream << "Total= " << t  << ". N= " << n << ", E= " << e << ", Spike= " << s << ". Grouped: " << e_grouped.size() << "\n" ; 
-        std::filesystem::path e_gr = split_E ? dir / ("E.gr" + fasta_name) : std::filesystem::path( "E.fasta");
-        seqan3::sequence_file_output file_e_gr{e_gr};
+            if (sg.beg >= 0 && sg.end+beg <= sq.size()) return true; 
 
-    }
+            // incomplete seq.
+            if (sg.beg < 0)
+            {    
+                grouped.erase(seqan3::dna5_vector{bg, en});
+                SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+beg+sg.beg, sq.begin()+sg.end}];
+                if (sgr.count++)
+                {
+                    sgr.beg = 0;
+                    sgr.end = e_len;
+                    sgr.id = record.id();
+                }
+                seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
+            }
+            if (sg.beg < 0 || sg.end > end) 
+            {    
+                grouped.erase(seqan3::dna5_vector{bg, en});
+                SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+beg+sg.beg, sq.begin()+sg.end}];
+                if (sgr.count++)
+                {
+                    sgr.beg = 0;
+                    sgr.end = e_len;
+                    sgr.id = record.id();
+                }
+                seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
+            }
+            return true;
+        }
     void set_seq_pos(const seqan3::dna5_vector& s, SeqGr& sg)
     {
         auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
@@ -211,7 +202,16 @@ public:
             e_len = res_r.sequence1_end_position() - res.sequence1_begin_position() + 1 ;
         }
         sg.end = sg.beg + e_len;
+        if ()
     }
+        void write_grouped (std::filesystem::path& const dir, std::string& const fasta_name)
+        {
+            if (!split) return;
+            std::filesystem::path gr = dir / ("E_gr." + fasta_name);
+            seqan3::sequence_file_output file_e_gr{gr};
+
+        }
+        
     void set_e_forw(const std::string& pr)
     {
          e_forw.clear();
@@ -224,6 +224,87 @@ public:
          auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
          e_rev = seqan3::dna5_vector{e.begin(), e.end()}; 
          seqan3::debug_stream  << " from " << pr << ", e_rev: " << e_rev;
+    }
+
+    };    
+    std::filesystem::path fasta, dir;
+    std::string fasta_name;
+    SplitGene split_e, split_n, split_s;
+
+public:
+    SplitCoVfasta(const std::filesystem::path& fasta, bool split_E, bool split_N, bool split_S)
+    : fasta{fasta}, dir{fasta.parent_path()}, fasta_name{fasta.filename().string()}
+    {
+        std::cout << std::boolalpha  << "\nGoing to split: " << fasta.string() 
+                << ", gene E: " << split_E  
+                << ", gene N: " << split_N << ", gene Spike: " << split_S   ;
+        split_e.split = split_E; 
+        split_n.split = split_N;
+        split_s.split = split_S;
+
+        split_e.start = "E|"; 
+        split_n.start = "N|";
+        split_s.start = "Spike|";
+    
+    }
+    void split_fasta( )
+    {
+
+        // Initialise a file input object with a FASTA file.
+        seqan3::sequence_file_input file_in{fasta};
+
+        long t{0L}, m{(1L<<15)-1};
+        seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
+
+        using id_t = decltype(file_in)::id_type;
+        {
+            std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
+            std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
+            std::filesystem::path s_fasta = split_S ? dir / ("Spike." + fasta_name) : std::filesystem::path( "S.fasta");
+            seqan3::sequence_file_output file_E{e_fasta};
+            seqan3::sequence_file_output file_N{n_fasta};
+            seqan3::sequence_file_output file_S{s_fasta};
+
+            for (auto & record : file_in)
+            {
+                     if (split_e.check(record)) file_E.push_back(std::move(record));
+                else if (split_n.check(record)) file_N.push_back(std::move(record));
+                else if (split_s.check(record)) file_S.push_back(std::move(record));
+                if (!(++t & m)) 
+                    seqan3::debug_stream << "\tT= " << t << ", N= " << split_n.count << ", E= " << split_e.count << ", Spike= " << split_s.count 
+                                         << ". Grouped N: " << split_n.grouped.size() 
+                                         << ". Grouped E: " << split_e.grouped.size() 
+                                         << ". Grouped S: " << split_s.grouped.size() << "\n" ; 
+                if (t>300000) break;
+            }
+        }
+        seqan3::debug_stream << "\nTotal= " << t << ", N= " << split_n.count << ", E= " << split_e.count << ", Spike= " << split_s.count 
+                             << ". Grouped N: " << split_n.grouped.size() 
+                             << ". Grouped E: " << split_e.grouped.size() 
+                             << ". Grouped S: " << split_s.grouped.size() << "\n" ; 
+        
+
+    }
+
+    void set_e_forw(const std::string& pr)
+    {
+         split_e.set_e_forw(pr);
+         seqan3::debug_stream << "\n from " << pr << " e_forw: " << split_e.forw;
+    }
+    void set_e_rev(const std::string& pr)
+    {
+         split_e.set_e_rev(pr);
+         seqan3::debug_stream  << " from " << pr << ", e_rev: " << split_e.rev;
+    }
+    void set_n_forw(const std::string& pr)
+    {
+         split_n.set_e_forw(pr);
+         seqan3::debug_stream << "\n from " << pr << " n_forw: " << split_n.forw;
+    }
+    void set_n_rev(const std::string& pr)
+    {
+         split_n.set_e_rev(pr);
+         seqan3::debug_stream  << " from " << pr << ", e_rev: " << split_n.rev;
     }
 };
  
@@ -249,13 +330,13 @@ public:
         input_file.tip_string("Original fasta file:").multi_lines(false);
         e_forw_tb.tip_string("Seq. forward primer").multi_lines(false).reset("ACAggTACgTTAATAgTTAATAgCgT");
         e_rev_tb.tip_string("Seq. reverse primer").multi_lines(false).reset("CAATATTgCAgCAgTACgCACA");
-        n_forw_tb.tip_string("Seq. forward primer").multi_lines(false);
-        n_rev_tb.tip_string("Seq. reverse primer").multi_lines(false);
+        n_forw_tb.tip_string("Seq. forward primer").multi_lines(false).reset("CCAAAAggCTTCTACgCAgA");
+        n_rev_tb.tip_string("Seq. reverse primer").multi_lines(false).reset("TgCCTggAgTTgAATTTCTTgA");
         s_forw_tb.tip_string("Seq. forward primer").multi_lines(false);
         s_rev_tb.tip_string("Seq. reverse primer").multi_lines(false); 
 
-        auto& E = gene.add_option("E");
-        auto& N = gene.add_option("N");
+        auto& E = gene.add_option("E"); E.check(true);
+        auto& N = gene.add_option("N"); N.check(true);
         auto& S = gene.add_option("Spike");
 
         run_split.events().click([&]()
