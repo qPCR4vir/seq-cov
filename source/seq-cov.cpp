@@ -117,7 +117,17 @@ private:
                 << ", gene " << gene <<": " << split << " into "
                 << (parent.dir / (gene + "." + parent.fasta_name)).string();
         }
+        
         bool check(auto& record)
+        {
+            if (!split_e.check_rec(record)) 
+                return false;
+
+            file_fasta_split.push_back(std::move(record));
+            return true;
+        }
+
+        bool check_rec(auto& record)
         {
             if (!split_e.split) return false;
             if (!record.id().starts_with(start)) return false;
@@ -304,43 +314,32 @@ public:
     {
         genes.emplace_back(this, gene, split).set_forw(fw)
                                              .set_rev (rv);
-
     }
     void split_fasta( )
     {
-
         // Initialise a file input object with a FASTA file.
         seqan3::sequence_file_input file_in{fasta};
 
         long t{0L}, m{(1L<<15)-1};
         seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
-        using id_t = decltype(file_in)::id_type;
+        for (auto & record : file_in)
         {
-            std::filesystem::path e_fasta = split_E ? dir / ("E." + fasta_name) : std::filesystem::path( "E.fasta");
-            std::filesystem::path n_fasta = split_N ? dir / ("N." + fasta_name) : std::filesystem::path( "N.fasta");
-            std::filesystem::path s_fasta = split_S ? dir / ("Spike." + fasta_name) : std::filesystem::path( "S.fasta");
-            seqan3::sequence_file_output file_E{e_fasta};
-            seqan3::sequence_file_output file_N{n_fasta};
-            seqan3::sequence_file_output file_S{s_fasta};
+            for (auto & gene : genes)
+                    if (gene.check(record)) break;
 
-            for (auto & record : file_in)
+            if (!(++t & m)) 
             {
-                     if (split_e.check(record)) file_E.push_back(std::move(record));
-                else if (split_n.check(record)) file_N.push_back(std::move(record));
-                else if (split_s.check(record)) file_S.push_back(std::move(record));
-                if (!(++t & m)) 
-                    seqan3::debug_stream << "\tT= " << t << ", N= " << split_n.count << ", E= " << split_e.count << ", Spike= " << split_s.count 
-                                         << ". Grouped N: " << split_n.grouped.size() 
-                                         << ". Grouped E: " << split_e.grouped.size() 
-                                         << ". Grouped S: " << split_s.grouped.size() << "\n" ; 
-                if (t>300000) break;
+                seqan3::debug_stream << "\tT= " << t  << "\n" ;
+                for (auto & gene : genes)
+                   seqan3::debug_stream << gene.gene <<"= " << gene.count 
+                                        << ". Grouped: "    << gene.grouped.size() << "\n" ; 
             }
         }
-        seqan3::debug_stream << "\nTotal= " << t << ", N= " << split_n.count << ", E= " << split_e.count << ", Spike= " << split_s.count 
-                             << ". Grouped N: " << split_n.grouped.size() 
-                             << ". Grouped E: " << split_e.grouped.size() 
-                             << ". Grouped S: " << split_s.grouped.size() << "\n" ; 
+        seqan3::debug_stream << "\nTotal= " << t  << "\n" ;
+        for (auto & gene : genes)
+            seqan3::debug_stream << gene.gene <<"= " << gene.count 
+                                 << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         
 
     }
