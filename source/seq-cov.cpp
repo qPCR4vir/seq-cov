@@ -5,17 +5,17 @@
 //#include <algorithm>
 #include <unordered_map>
 //#include <ranges>
- 
+#include <stdexcept>
+	
 #include <seqan3/std/ranges>                    // include all of the standard library's views
 #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
-#include <seqan3/core/debug_stream.hpp>         // for debug_stream
-#include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
-#include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
-#include <seqan3/argument_parser/all.hpp> 
-//#include <seqan3/alphabet/range/hash.hpp>
 #include <seqan3/alphabet/hash.hpp>
+#include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
+//#include <seqan3/alphabet/range/hash.hpp>
+#include <seqan3/core/debug_stream.hpp>         // for debug_stream
 #include <seqan3/core/range/type_traits.hpp>
-#include <seqan3/std/ranges>
+#include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
+#include <seqan3/argument_parser/all.hpp> 
 #include <seqan3/alignment/configuration/align_config_method.hpp>
 #include <seqan3/alignment/pairwise/align_pairwise.hpp>
 #include <seqan3/alignment/configuration/align_config_edit.hpp>
@@ -91,25 +91,24 @@ class SplitCoVfasta
 {
 public:    
     using sequence_type = seqan3::dna5_vector;
+    using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
 private:
     struct SplitGene
     {
         SplitCoVfasta const &parent;
         bool          split;
-        std::sting    gene;
+        std::string    gene;
         
         sequence_type forw, rev, target; 
         int           beg{0}, end{0}, len{0}, count{0}; 
-        std::sting    start;
+        std::string    start{gene+"|"};
         std::unordered_map<sequence_type, SeqGr> grouped; 
-        seqan3::sequence_file_output file_E;   // todo implement conditional split
+        sequence_file_output file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};   // todo implement conditional split
         
-        SplitGene(SplitCoVfasta const *parent, std::string gene, bool split)
-        : parent{*parent}, 
+        SplitGene(SplitCoVfasta const &parent, std::string gene, bool split)
+        : parent{parent}, 
           gene{gene}, 
-          split{split}, 
-          start{gene+"|"},
-          file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};
+          split{split}
         {
             //if (split) file_E.open( );  // todo implement conditional split
             std::cout << std::boolalpha  
@@ -120,7 +119,7 @@ private:
         
         bool check(auto& record)
         {
-            if (!split_e.check_rec(record)) 
+            if (!check_rec(record)) 
                 return false;
 
             file_fasta_split.push_back(std::move(record));
@@ -129,7 +128,7 @@ private:
 
         bool check_rec(auto& record)
         {
-            if (!split_e.split) return false;
+            if (!split) return false;
             if (!record.id().starts_with(start)) return false;
             const seqan3::dna5_vector &sq = record.sequence();
             count++;
@@ -157,8 +156,8 @@ private:
                 }
                 sg.end = sg.end - sg.beg;
 
-                bg = sq.begin()+beg;
-                en = sq.begin()+end;
+                auto bg = sq.begin()+beg;
+                auto en = sq.begin()+end;
                 target = seqan3::dna5_vector{bg, en};
 
                 grouped[target] = sg;
@@ -229,10 +228,10 @@ private:
             
             auto results = seqan3::align_pairwise(std::tie(s, forw), config);
             auto & res = *results.begin();
-            seqan3::debug_stream << "Score: "     << res.score() ;
+            seqan3::debug_stream << "\nAlignment: " << res.alignment() << "Score: "     << res.score() ;
             seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
             seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
-                                 << "Alignment: " << res.alignment();
+                                 ;
             
             if (res.score() > 15)  // forw primer found. todo set this 15 as program parameter
             {
@@ -246,7 +245,7 @@ private:
             else 
             {
                 if (!len)
-                    throw std::exception{"First " + gene + " sequence don't contain the forward primer"};
+                    throw std::runtime_error{"First " + gene + " sequence don't contain the forward primer"};
                 else
                     sg.beg = -1;  // todo ??
             }
@@ -268,12 +267,12 @@ private:
             }
 
             if (!len)
-                    throw std::exception{"First " + gene + " sequence don't contain the reverse primer"};
+                    throw std::runtime_error{"First " + gene + " sequence don't contain the reverse primer"};
 
-            throw std::exception{gene + " sequence don't contain the forward and reverse primers"};
+            throw std::runtime_error{gene + " sequence don't contain the forward and reverse primers"};
         }
 
-        void write_grouped (std::filesystem::path& const dir, std::string& const fasta_name)
+        void write_grouped (const std::filesystem::path& dir, const std::string& fasta_name)
         {
             if (!split) return;
             std::filesystem::path gr = dir / ("E_gr." + fasta_name);
@@ -289,7 +288,7 @@ private:
             seqan3::debug_stream << "\n from " << pr << ", forw: " << forw;
             return *this;
         }
-        void set_rev(const std::string& pr)
+        SplitGene& set_rev(const std::string& pr)
         {
             if (pr.empty()) return *this;
             auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
@@ -312,8 +311,8 @@ public:
 
     void add_gene(std::string gene, bool split, std::string fw="", std::string rv="")  // todo implement conditional split
     {
-        genes.emplace_back(this, gene, split).set_forw(fw)
-                                             .set_rev (rv);
+        genes.emplace_back(*this, gene, split).set_forw(fw)
+                                              .set_rev (rv);
     }
     void split_fasta( )
     {
@@ -379,17 +378,14 @@ public:
         run_split.events().click([&]()
         {
             std::filesystem::path fasta{input_file.text()};
-            if (!fasta.is_regular()) return;  // todo msg
+            if (!std::filesystem::is_regular_file(fasta)) return;  // todo msg
 
-            SplitCoVfasta sp{};
+            SplitCoVfasta sp{fasta};
 
             // todo implement conditional split
-            if (E.checked()) 
-                sp.add_gene("E", E.checked(), e_forw_tb.text(), e_rev_tb.text())
-            if (N.checked())  
-                sp.add_gene("N", N.checked(), n_forw_tb.text(), n_rev_tb.text())
-            if (S.checked()) 
-                sp.add_gene("Spike", S.checked(), s_forw_tb.text(), s_rev_tb.text())
+            if (E.checked()) sp.add_gene("E",     E.checked(), e_forw_tb.text(), e_rev_tb.text());
+            if (N.checked()) sp.add_gene("N",     N.checked(), n_forw_tb.text(), n_rev_tb.text());
+            if (S.checked()) sp.add_gene("Spike", S.checked(), s_forw_tb.text(), s_rev_tb.text());
 
             sp.split_fasta();
         });
