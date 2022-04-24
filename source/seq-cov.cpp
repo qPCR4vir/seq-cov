@@ -83,13 +83,15 @@ struct hash<urng_t>
 struct SeqGr
 {
     int count{0};
-    int beg, end;
+    int beg, end;  // position of the actual target IN THIS grouped seq.
     std::string id;
 };
 
 class SplitCoVfasta
 {
+public:    
     using sequence_type = seqan3::dna5_vector;
+private:
     struct SplitGene
     {
         SplitCoVfasta const &parent;
@@ -119,8 +121,45 @@ class SplitCoVfasta
         {
             if (!split_e.split) return false;
             if (!record.id().starts_with(start)) return false;
-            count++;
             const seqan3::dna5_vector &sq = record.sequence();
+            count++;
+            
+            if (!len)
+            {   
+                // assume the first sequence is OK
+                // todo don't assume the first sequence is OK
+                SeqGr sg=set_seq_pos(sq); 
+                sg.id = record.id();
+                sg.count = 1;
+                len = sg.end - sg.beg;
+
+                if (sg.end + 20 > sq.size())  // todo set this 20 as program parameter
+                    end  = sq.size();     // seq not too long
+                else 
+                    end = sg.end + 20 ;
+
+                if (sg.beg < 20)  // todo set this 20 as program parameter
+                    beg = 0;
+                else 
+                {
+                    beg = beg - 20 ;
+                    sg.beg = 20;
+                }
+                sg.end = sg.end - sg.beg;
+
+                bg = sq.begin()+beg;
+                en = sq.begin()+end;
+                target = seqan3::dna5_vector{bg, en};
+
+                grouped[target] = sg;
+                // todo what if incomplete ??
+                // todo make sure this first target-sequence is correct !!!!
+                // this will be the "standart" target-sequence
+                
+                seqan3::debug_stream << "\nTarget sequence: " << start << target << "\n" ; 
+                return true; 
+            }
+
             int lend= end > sq.size() ? sq.size() : end;
             int lbeg= lend - len < beg ? (lend - len < 0 ? 0 : lend - len) : beg ;
 
@@ -131,54 +170,38 @@ class SplitCoVfasta
             
             // new, unknown seq.
             seqan3::debug_stream << "\n"  <<  seqan3::dna5_vector{bg, en} << "\n" ;
-            sg.id = record.id();
-            set_seq_pos(sq, sg);  // true align to correct position 
-            
-            if (bg == en) // this is the first seq
-            {
-                grouped.erase(seqan3::dna5_vector{bg, en});
-                bg = sq.begin()+beg;
-                en = sq.begin()+end;
-                target = seqan3::dna5_vector{bg, en};
-                grouped[target] = sg;
-                // todo what if incomplete ??
-                // todo make sure this first target-sequence is correct !!!!
-                // this will be the "standart" target-sequence
-                
-                seqan3::debug_stream << "\nTarget sequence: " << start << target << "\n" ; 
-                return true; 
-            }
-            if (sg.beg >= 0 && sg.end+beg <= sq.size()) return true; 
 
-            // incomplete seq.
-            if (sg.beg < 0)
-            {    
-                grouped.erase(seqan3::dna5_vector{bg, en});
-                SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+beg+sg.beg, sq.begin()+sg.end}];
-                if (sgr.count++)
-                {
-                    sgr.beg = 0;
-                    sgr.end = e_len;
-                    sgr.id = record.id();
-                }
-                seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
+            sg=set_seq_pos(sq);   // true align to correct position 
+            sg.id = record.id();
+            
+            if (sg.end + 20 > sq.size())  // todo set this 20 as program parameter
+                lend = sg.end + 20 ;
+
+            if (sg.beg < 20)  // todo set this 20 as program parameter
+                lbeg = 0;
+            else 
+            {
+                lbeg = sg.beg - 20 ;
+                sg.beg = 20;
             }
-            if (sg.beg < 0 || sg.end > end) 
-            {    
-                grouped.erase(seqan3::dna5_vector{bg, en});
-                SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+beg+sg.beg, sq.begin()+sg.end}];
-                if (sgr.count++)
-                {
-                    sgr.beg = 0;
-                    sgr.end = e_len;
-                    sgr.id = record.id();
-                }
-                seqan3::debug_stream << seqan3::dna5_vector{sq.begin()+sg.beg, sq.begin()+sg.end}  << "\n" ; 
-            }
+            sg.end = sg.end - sg.beg;
+
+            if (beg <= lbeg && lend <= end) return true; 
+
+            grouped.erase(seqan3::dna5_vector{bg, en});
+
+            SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+lbeg, sq.begin()+lend}];
+            if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
+
+            sgr = sg;
             return true;
         }
-        void set_seq_pos(const seqan3::dna5_vector& s, SeqGr& sg)
+        SeqGr set_seq_pos(const seqan3::dna5_vector& s)
         {
+            // new, unknown seq. We need to find the right position of the target sequence
+            // less than 1% of the seq. May be around 50k?
+            SeqGr sg;
+            
             auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
                                  seqan3::align_cfg::output_end_position{} | seqan3::align_cfg::output_alignment{};
             auto method = seqan3::align_cfg::method_local{};
@@ -200,28 +223,46 @@ class SplitCoVfasta
             seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
             seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
                                  << "Alignment: " << res.alignment();
-            sg.count += 1;
-            sg.beg = res.sequence1_begin_position() - beg;
-            if (!end)
+            
+            if (res.score() > 15)  // forw primer found. todo set this 15 as program parameter
             {
-                beg = res.sequence1_begin_position(); 
-                if (beg < 20)
-                    beg = 0;
-                else 
-                    beg = beg - 20 ;
-                sg.beg = res.sequence1_begin_position() - beg;
-                auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
-                auto & res_r = *res_rev.begin();
-                seqan3::debug_stream << "Score: " << res_r.score() ;
-                seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-                seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
-                                << "Alignment: " << res_r.alignment();
-                end = res_r.sequence1_end_position() + 20 ;
-                len = res_r.sequence1_end_position() - res.sequence1_begin_position() + 1 ;
+                sg.beg = res.sequence1_begin_position();   // todo check beg primer align
+                if (len)
+                {
+                    sg.end = sg.beg + len;
+                    return sg; 
+                }
             }
-            sg.end = sg.beg + len;
-            if ()
+            else 
+            {
+                if (!len)
+                    throw std::exception{"First " + gene + " sequence don't contain the forward primer"};
+                else
+                    sg.beg = -1;  // todo ??
+            }
+            // we need to find rev primer location
+
+            auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
+            auto & res_r = *res_rev.begin();
+            seqan3::debug_stream << "Score: " << res_r.score() ;
+            seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
+                                 << "Alignment: " << res_r.alignment();
+
+            if (res_r.score() > 15)  // rev primer found. todo set this 15 as program parameter
+            {   
+                sg.end = res_r.sequence1_end_position() ;  // todo check end primer align
+                if (len)
+                    sg.beg = sg.end - len;
+                return sg;
+            }
+
+            if (!len)
+                    throw std::exception{"First " + gene + " sequence don't contain the reverse primer"};
+
+            throw std::exception{gene + " sequence don't contain the forward and reverse primers"};
         }
+
         void write_grouped (std::filesystem::path& const dir, std::string& const fasta_name)
         {
             if (!split) return;
@@ -246,11 +287,12 @@ class SplitCoVfasta
             seqan3::debug_stream  << " from " << pr << ", rev: " << rev;
             return *this;
         }
-
     };    
+public:
     std::filesystem::path fasta;
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()};
+private:
     std::vector<SplitGene> genes;
 
 public:
