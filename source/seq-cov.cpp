@@ -151,7 +151,7 @@ private:
                     beg = 0;
                 else 
                 {
-                    beg = beg - 20 ;
+                    beg = sg.beg - 20 ;
                     sg.beg = 20;
                 }
                 sg.end = sg.end - sg.beg;
@@ -165,7 +165,8 @@ private:
                 // todo make sure this first target-sequence is correct !!!!
                 // this will be the "standart" target-sequence
                 
-                seqan3::debug_stream << "\nTarget sequence: " << start << target << "\n" ; 
+                seqan3::debug_stream << " Target sequence: " << start << target 
+                                     << " (" << beg << ", "  << end  <<")\n" ;
                 return true; 
             }
 
@@ -178,12 +179,22 @@ private:
             if (sg.count++) return true; // duplicate seq. More than 99% of cases.
             
             // new, unknown seq.
-            seqan3::debug_stream << "\n"  <<  seqan3::dna5_vector{bg, en} << "\n" ;
+            
 
             sg=set_seq_pos(sq);   // true align to correct position 
+            if (sg.beg == -1 || sg.end == -1)
+            {
+                seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
+                                      << " (" << lbeg << ", " << lend  <<")\n" ;
+                return true; // todo ???????????????
+            }
+            seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
+                                 << " (" << lbeg << ", " << lend  <<")\n" ;
             sg.id = record.id();
             
             if (sg.end + 20 > sq.size())  // todo set this 20 as program parameter
+                lend  = sq.size();     // seq not too long
+            else 
                 lend = sg.end + 20 ;
 
             if (sg.beg < 20)  // todo set this 20 as program parameter
@@ -195,13 +206,13 @@ private:
             }
             sg.end = sg.end - sg.beg;
 
-            if (beg <= lbeg && lend <= end) return true; 
+            //if (beg <= lbeg && lend <= end) return true; 
 
             grouped.erase(seqan3::dna5_vector{bg, en});
-
+            seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
             SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+lbeg, sq.begin()+lend}];
             if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
-
+            seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr = sg;
             return true;
         }
@@ -228,9 +239,9 @@ private:
             
             auto results = seqan3::align_pairwise(std::tie(s, forw), config);
             auto & res = *results.begin();
-            seqan3::debug_stream << "\nAlignment: " << res.alignment() << "Score: "     << res.score() ;
+            seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
             seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-            seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << ")\n"
+            seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). "
                                  ;
             
             if (res.score() > 15)  // forw primer found. todo set this 15 as program parameter
@@ -253,10 +264,10 @@ private:
 
             auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
             auto & res_r = *res_rev.begin();
-            seqan3::debug_stream << "Score: " << res_r.score() ;
+            seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
             seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << ")\n"
-                                 << "Alignment: " << res_r.alignment();
+            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). "
+                                 ;
 
             if (res_r.score() > 15)  // rev primer found. todo set this 15 as program parameter
             {   
@@ -268,8 +279,8 @@ private:
 
             if (!len)
                     throw std::runtime_error{"First " + gene + " sequence don't contain the reverse primer"};
-
-            throw std::runtime_error{gene + " sequence don't contain the forward and reverse primers"};
+            sg.end = -1;
+            return sg;
         }
 
         void write_grouped (const std::filesystem::path& dir, const std::string& fasta_name)
@@ -334,6 +345,7 @@ public:
                    seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                         << ". Grouped: "    << gene.grouped.size() << "\n" ; 
             }
+            if (t>1000000) break;
         }
         seqan3::debug_stream << "\nTotal= " << t  << "\n" ;
         for (auto & gene : genes)
