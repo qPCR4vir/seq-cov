@@ -285,10 +285,31 @@ private:
 
         void write_grouped (const std::filesystem::path& dir, const std::string& fasta_name)
         {
-            if (!split) return;
+            
+            using types = seqan3::type_list<std::vector<seqan3::dna5>, std::string>;
+            using fields = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
+            using record_t = seqan3::sequence_record<types, fields>;
+            using sgr_t = decltype(grouped)::value_type;
+
+            if (!split) return;  // todo ?????
+
             std::filesystem::path gr = dir / ("E_gr." + fasta_name);
             seqan3::sequence_file_output file_e_gr{gr};
+            
+            std::vector<sgr_t> gr_v;
+            gr_v.reserve(grouped.size());
+            gr_v.insert(gr_v.begin(), grouped.begin(), grouped.end());
+            std::sort(gr_v.begin(), gr_v.end(), [](const sgr_t &a, const sgr_t &b)
+            {return a.secound.count > b.secound.count;});
 
+            for(sgr_t& sg:gr_v)
+            {
+                auto id = "x_" + std::to_string(sg.secound.count) 
+                         + "_" + std::to_string(sg.secound.beg) 
+                         + "_" + std::to_string(sg.secound.end)
+                         + sg.secound.id ;
+                file_e_gr.push_back(record_t{std::move(sg.first), std::move(id)});
+            }
         }
         
         SplitGene& set_forw(const std::string& pr)
