@@ -83,7 +83,7 @@ struct hash<urng_t>
 struct SeqGr
 {
     int count{0};
-    int beg, end;  // position of the actual target IN THIS grouped seq.
+    int beg{0}, end{0};  // position of the actual target IN THIS grouped seq.
     std::string id;
 };
 
@@ -132,6 +132,8 @@ private:
             if (!record.id().starts_with(start)) return false;
             const seqan3::dna5_vector &sq = record.sequence();
             count++;
+
+            int flank = 20 ;
             
             if (!len)
             {   
@@ -142,19 +144,18 @@ private:
                 sg.count = 1;
                 len = sg.end - sg.beg;
 
-                if (sg.end + 20 > sq.size())  // todo set this 20 as program parameter
+                if (sg.end + flank > sq.size())  // todo set this flank as program parameter
                     end  = sq.size();     // seq not too long
                 else 
-                    end = sg.end + 20 ;
+                    end = sg.end + flank ;
 
-                if (sg.beg < 20)  // todo set this 20 as program parameter
+                if (sg.beg < flank)  // todo set this flank as program parameter
                     beg = 0;
                 else 
-                {
-                    beg = sg.beg - 20 ;
-                    sg.beg = 20;
-                }
-                sg.end = sg.end - sg.beg;
+                    beg = sg.beg - flank ;
+                    
+                sg.beg = sg.beg - beg;
+                sg.end = sg.end - beg;
 
                 auto bg = sq.begin()+beg;
                 auto en = sq.begin()+end;
@@ -175,36 +176,38 @@ private:
 
             auto bg = sq.begin()+lbeg;
             auto en = sq.begin()+lend;
-            SeqGr& sg = grouped[seqan3::dna5_vector{bg, en}];  // first try
-            if (sg.count++) return true; // duplicate seq. More than 99% of cases.
+            SeqGr& sg1 = grouped[seqan3::dna5_vector{bg, en}];  // first try
+            if (sg1.count++) return true; // duplicate seq. More than 99% of cases.
             
             // new, unknown seq.
-            
 
-            sg=set_seq_pos(sq);   // true align to correct position 
+            SeqGr sg=set_seq_pos(sq);   // true align to correct position 
+            sg.id = record.id();
             if (sg.beg == -1 || sg.end == -1)
             {
+                sg1.id = std::move(sg.id);
+                sg1.beg = sg.beg ;
+                sg1.end = sg.end ;
                 seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
                                       << " (" << lbeg << ", " << lend  <<")\n" ;
                 return true; // todo ???????????????
             }
             seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
                                  << " (" << lbeg << ", " << lend  <<")\n" ;
-            sg.id = record.id();
+
             
-            if (sg.end + 20 > sq.size())  // todo set this 20 as program parameter
+            if (sg.end + flank > sq.size())  // todo set this flank as program parameter
                 lend  = sq.size();     // seq not too long
             else 
-                lend = sg.end + 20 ;
+                lend = sg.end + flank ;
 
-            if (sg.beg < 20)  // todo set this 20 as program parameter
+            if (sg.beg < flank)  // todo set this flank as program parameter
                 lbeg = 0;
             else 
-            {
-                lbeg = sg.beg - 20 ;
-                sg.beg = 20;
-            }
-            sg.end = sg.end - sg.beg;
+                lbeg = sg.beg - flank ;
+                
+            sg.beg = sg.beg - beg;
+            sg.end = sg.end - beg;
 
             //if (beg <= lbeg && lend <= end) return true; 
 
@@ -213,7 +216,9 @@ private:
             SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+lbeg, sq.begin()+lend}];
             if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
             seqan3::debug_stream << " It was new !!!!!!!\n" ;
-            sgr = sg;
+            sgr.beg = sg.beg;
+            sgr.end = sg.end;
+            sgr.id = sg.id;
             return true;
         }
         SeqGr set_seq_pos(const seqan3::dna5_vector& s)
@@ -283,32 +288,34 @@ private:
             return sg;
         }
 
-        void write_grouped (const std::filesystem::path& dir, const std::string& fasta_name)
+        void write_grouped ()
         {
             
             using types = seqan3::type_list<std::vector<seqan3::dna5>, std::string>;
             using fields = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
             using record_t = seqan3::sequence_record<types, fields>;
             using sgr_t = decltype(grouped)::value_type;
+            using sgr_p = sgr_t*;
 
             if (!split) return;  // todo ?????
 
-            std::filesystem::path gr = dir / ("E_gr." + fasta_name);
+            std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
             seqan3::sequence_file_output file_e_gr{gr};
             
-            std::vector<sgr_t> gr_v;
+            std::vector<sgr_p> gr_v;
             gr_v.reserve(grouped.size());
-            gr_v.insert(gr_v.begin(), grouped.begin(), grouped.end());
-            std::sort(gr_v.begin(), gr_v.end(), [](const sgr_t &a, const sgr_t &b)
-            {return a.secound.count > b.secound.count;});
+            for (sgr_t& sgr : grouped)
+                gr_v.push_back(&sgr);
+            std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)
+            {return a->second.count > b->second.count;});
 
-            for(sgr_t& sg:gr_v)
+            for(sgr_p sg:gr_v)
             {
-                auto id = "x_" + std::to_string(sg.secound.count) 
-                         + "_" + std::to_string(sg.secound.beg) 
-                         + "_" + std::to_string(sg.secound.end)
-                         + sg.secound.id ;
-                file_e_gr.push_back(record_t{std::move(sg.first), std::move(id)});
+                auto id = "x_" + std::to_string(sg->second.count) 
+                         + "_" + std::to_string(sg->second.beg) 
+                         + "_" + std::to_string(sg->second.end)
+                         + "_" + sg->second.id ;
+                file_e_gr.push_back(record_t{std::move(sg->first), std::move(id)});
             }
         }
         
@@ -370,9 +377,11 @@ public:
         }
         seqan3::debug_stream << "\nTotal= " << t  << "\n" ;
         for (auto & gene : genes)
+        {
             seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                  << ". Grouped: "    << gene.grouped.size() << "\n" ; 
-        
+            gene.write_grouped();
+        }
 
     }
 };

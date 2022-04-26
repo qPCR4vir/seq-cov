@@ -13,6 +13,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana" "${CMAKE_CURRENT_S
  
 # build app with seqan3
 add_executable (seq-cov source/seq-cov.cpp)
+#set_property(TARGET seq-cov PROPERTY CXX_STANDARD C++20)
 target_link_libraries (seq-cov PUBLIC -static)
 target_link_libraries(seq-cov
         PUBLIC
