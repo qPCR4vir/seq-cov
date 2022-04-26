@@ -27,6 +27,8 @@
 #include <nana/gui/widgets/progress.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 #include <nana/gui/widgets/combox.hpp>
+#include <nana/gui/widgets/spinbox.hpp>
+#include <nana/gui/widgets/panel.hpp>
 #include <nana/gui/filebox.hpp>
 #include <nana/gui/msgbox.hpp>
 #include <nana/gui/tooltip.hpp>
@@ -386,36 +388,49 @@ public:
     }
 };
  
-
+class GeneGUI: public nana::panel<false>
+{
+    public:
+    GeneGUI(nana::window parent, std::string gene_name="", std::string fw="", std::string rv="")
+    : nana::panel<false>(parent)
+    {
+        gene.multi_lines(false).reset(gene_name);
+        forw.tip_string("Seq. forward primer").multi_lines(false).reset(fw);
+        rev.tip_string("Seq. reverse primer").multi_lines(false).reset(rv);
+        plc.div(R"( <min=500 all arrange=[35, 60,80,100,180,180] gap=10> )");
+        plc["all"] << "Gene" << gene << split << group << forw << rev ;
+        plc.collocate();
+    }
+    nana::textbox  gene     {*this};  // todo use a combox 
+    nana::checkbox split    {*this, "split full"},
+                   group    {*this, "group target"};
+    nana::textbox  forw     {*this};
+    nana::textbox  rev      {*this};
+    nana::place    plc      {*this};
+};
 class GUI: public nana::form
 {
     nana::label    input_file_label{*this, "Original fasta file:"};
     nana::textbox  input_file      {*this};
+    nana::spinbox  flank           {*this};
     nana::button   set             {*this, "&Select"}, 
                    run_split       {*this, "S&plit" };
-    nana::group    gene            {*this, "Gene"   };
-    nana::textbox  e_forw_tb       {*this};
-    nana::textbox  e_rev_tb        {*this};
-    nana::textbox  n_forw_tb       {*this};
-    nana::textbox  n_rev_tb        {*this};    
-    nana::textbox  s_forw_tb       {*this};
-    nana::textbox  s_rev_tb        {*this};
+    GeneGUI        E               {*this, "E", "ACAggTACgTTAATAgTTAATAgCgT", "CAATATTgCAgCAgTACgCACA"},
+                   N               {*this, "N", "CCAAAAggCTTCTACgCAgA", "TgCCTggAgTTgAATTTCTTgA"},
+                   S               {*this, "Spike"};
+    
 public:
     GUI() : nana::form{nana::api::make_center(1000, 200)}
     {
         caption("Split-CoV-fasta. v0.01.00");
 
         input_file.tip_string("Original fasta file:").multi_lines(false);
-        e_forw_tb.tip_string("Seq. forward primer").multi_lines(false).reset("ACAggTACgTTAATAgTTAATAgCgT");
-        e_rev_tb.tip_string("Seq. reverse primer").multi_lines(false).reset("CAATATTgCAgCAgTACgCACA");
-        n_forw_tb.tip_string("Seq. forward primer").multi_lines(false).reset("CCAAAAggCTTCTACgCAgA");
-        n_rev_tb.tip_string("Seq. reverse primer").multi_lines(false).reset("TgCCTggAgTTgAATTTCTTgA");
-        s_forw_tb.tip_string("Seq. forward primer").multi_lines(false);
-        s_rev_tb.tip_string("Seq. reverse primer").multi_lines(false); 
+        flank.range(0, 100, 1);
+        flank.value("20");
 
-        auto& E = gene.add_option("E"); E.check(true);
-        auto& N = gene.add_option("N"); N.check(true);
-        auto& S = gene.add_option("Spike");
+        E.split.check(true);
+        N.split.check(true);
+        S.split.check(false);
 
         run_split.events().click([&]()
         {
@@ -425,9 +440,12 @@ public:
             SplitCoVfasta sp{fasta};
 
             // todo implement conditional split
-            if (E.checked()) sp.add_gene("E",     E.checked(), e_forw_tb.text(), e_rev_tb.text());
-            if (N.checked()) sp.add_gene("N",     N.checked(), n_forw_tb.text(), n_rev_tb.text());
-            if (S.checked()) sp.add_gene("Spike", S.checked(), s_forw_tb.text(), s_rev_tb.text());
+            if (E.split.checked() || E.group.checked()) 
+                sp.add_gene(E.gene.text(),     E.split.checked(), E.forw.text(), E.rev.text());
+            if (N.split.checked() || N.group.checked()) 
+                sp.add_gene(N.gene.text(),     N.split.checked(), N.forw.text(), N.rev.text());
+            if (S.split.checked() || S.group.checked()) 
+                sp.add_gene(S.gene.text(),    S.split.checked(),  S.forw.text(), S.rev.text());
 
             sp.split_fasta();
         });
@@ -443,20 +461,17 @@ public:
         });
 
         auto& p = get_place();
-        p.div(R"(<width=100 gene><vertical  margin=10 gap=10 min=300
-                                            <height=30 input arrange=[variable,60, 60] gap=10> 
-                                            <height=30 file >
-                                            <height=30 e_pr arrange=[40,180,180] gap=10> 
-                                            <height=30 n_pr arrange=[40,180,180] gap=10> 
-                                            <height=30 s_pr arrange=[40,180,180] gap=10> 
-                                            >   
+        p.div(R"(<vertical  margin=10 gap=10 min=300
+                    <height=25 input arrange=[variable,35,50, 60, 60] gap=10> 
+                    <height=10  >
+                    <height=30 file >
+                    <height=10  >
+                    <height=100 vertical genes gap=10> 
+                  >   
             )");
-        p["gene"]  << gene ;
-        p["input"] << input_file_label << set  << run_split ;
+        p["input"] << input_file_label << "Flank:" << flank << set  << run_split ;
         p["file"]  << input_file ;
-        p["e_pr"] << "E-gene" << e_forw_tb <<  e_rev_tb;
-        p["n_pr"] << "N-gene" << n_forw_tb <<  n_rev_tb;
-        p["s_pr"] << "Spike" << s_forw_tb <<  s_rev_tb;
+        p["genes"] << E << N << S;
         p.collocate();
     };
 };
