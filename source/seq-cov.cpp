@@ -439,13 +439,18 @@ public:
 
             SplitCoVfasta sp{fasta};
 
+            auto Add_Gene = [&sp](auto &g)
+            {
+            if (g.split.checked() || g.group.checked()) 
+                sp.add_gene(g.gene.text(),     
+                            g.split.checked(), 
+                            g.forw.text(),     g.rev.text());
+            };
+
             // todo implement conditional split
-            if (E.split.checked() || E.group.checked()) 
-                sp.add_gene(E.gene.text(),     E.split.checked(), E.forw.text(), E.rev.text());
-            if (N.split.checked() || N.group.checked()) 
-                sp.add_gene(N.gene.text(),     N.split.checked(), N.forw.text(), N.rev.text());
-            if (S.split.checked() || S.group.checked()) 
-                sp.add_gene(S.gene.text(),    S.split.checked(),  S.forw.text(), S.rev.text());
+            Add_Gene(E);
+            Add_Gene(N);
+            Add_Gene(S);
 
             sp.split_fasta();
         });
