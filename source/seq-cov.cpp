@@ -192,12 +192,12 @@ private:
                 sg1.id = std::move(sg.id);
                 sg1.beg = sg.beg ;
                 sg1.end = sg.end ;
-                seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
-                                      << " (" << lbeg << ", " << lend  <<")\n" ;
+              //  seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
+              //                        << " (" << lbeg << ", " << lend  <<")\n" ;
                 return true; // todo ???????????????
             }
-            seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
-                                 << " (" << lbeg << ", " << lend  <<")\n" ;
+            //seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
+            //                     << " (" << lbeg << ", " << lend  <<")\n" ;
 
             
             if (sg.end + flank > sq.size())  // todo set this flank as program parameter
@@ -216,10 +216,10 @@ private:
             //if (beg <= lbeg && lend <= end) return true; 
 
             grouped.erase(seqan3::dna5_vector{bg, en});
-            seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
+            // seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
             SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+lbeg, sq.begin()+lend}];
             if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
-            seqan3::debug_stream << " It was new !!!!!!!\n" ;
+            // seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg;
             sgr.end = sg.end;
             sgr.id = sg.id;
@@ -248,9 +248,9 @@ private:
             
             auto results = seqan3::align_pairwise(std::tie(s, forw), config);
             auto & res = *results.begin();
-            seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
-            seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-            seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). "
+            //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
+            //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+            //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). "
                                  ;
             
             if (res.score() > 15)  // forw primer found. todo set this 15 as program parameter
@@ -273,9 +273,9 @@ private:
 
             auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
             auto & res_r = *res_rev.begin();
-            seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
-            seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-            seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). "
+            //seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
+            //seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+            //seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). "
                                  ;
 
             if (res_r.score() > 15)  // rev primer found. todo set this 15 as program parameter
@@ -301,9 +301,10 @@ private:
             using sgr_t = decltype(grouped)::value_type;
             using sgr_p = sgr_t*;
 
-            if (!split) return;  // todo ?????
+            if (!group) return;  // todo ?????
 
             std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
+            seqan3::debug_stream << "\nGoing to write: " << gr.string();
             seqan3::sequence_file_output file_e_gr{gr};
             
             std::vector<sgr_p> gr_v;
@@ -363,7 +364,7 @@ public:
         // Initialise a file input object with a FASTA file.
         seqan3::sequence_file_input file_in{fasta};
 
-        long t{0L}, m{(1L<<15)-1};
+        long t{0L}, m{(1L<<18)-1};
         seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
         for (auto & record : file_in)
