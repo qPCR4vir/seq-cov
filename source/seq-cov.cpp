@@ -98,19 +98,20 @@ private:
     struct SplitGene
     {
         SplitCoVfasta const &parent;
-        bool          split;
-        std::string    gene;
+        bool          split, group,
+                      ignore{!(split || group)};
+        std::string   gene;
         
         sequence_type forw, rev, target; 
         int           beg{0}, end{0}, len{0}, count{0}; 
-        std::string    start{gene+"|"};
+        std::string   start{gene+"|"};
         std::unordered_map<sequence_type, SeqGr> grouped; 
         sequence_file_output file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};   // todo implement conditional split
         
-        SplitGene(SplitCoVfasta const &parent, std::string gene, bool split)
+        SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
         : parent{parent}, 
           gene{gene}, 
-          split{split}
+          split{split}, group{group}
         {
             //if (split) file_E.open( );  // todo implement conditional split
             std::cout << std::boolalpha  
@@ -119,24 +120,25 @@ private:
                 << (parent.dir / (gene + "." + parent.fasta_name)).string();
         }
         
+        /// record identified and ...?
         bool check(auto& record)
         {
-            if (!check_rec(record)) 
-                return false;
+            if (ignore) return false;
+            if (!record.id().starts_with(start)) return false;
+            
+            if (group) check_rec(record);
 
-            file_fasta_split.push_back(std::move(record));
+            if (split) file_fasta_split.push_back(std::move(record));
+            
             return true;
         }
 
         bool check_rec(auto& record)
         {
-            if (!split) return false;
-            if (!record.id().starts_with(start)) return false;
             const seqan3::dna5_vector &sq = record.sequence();
             count++;
+            int flank = parent.flank;
 
-            int flank = 20 ;
-            
             if (!len)
             {   
                 // assume the first sequence is OK
@@ -342,18 +344,19 @@ public:
     std::filesystem::path fasta;
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()};
+    int                   flank;
 private:
     std::vector<SplitGene> genes;
 
 public:
-    SplitCoVfasta(const std::filesystem::path& fasta)
-    : fasta{fasta}
+    SplitCoVfasta(const std::filesystem::path& fasta, int flank)
+    : fasta{fasta}, flank{flank}
     {}
 
-    void add_gene(std::string gene, bool split, std::string fw="", std::string rv="")  // todo implement conditional split
+    void add_gene(std::string gene, bool split, bool group, std::string fw="", std::string rv="")  // todo implement conditional split
     {
-        genes.emplace_back(*this, gene, split).set_forw(fw)
-                                              .set_rev (rv);
+        genes.emplace_back(*this, gene, split, group).set_forw(fw)
+                                                     .set_rev (rv);
     }
     void split_fasta( )
     {
@@ -375,7 +378,7 @@ public:
                    seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                         << ". Grouped: "    << gene.grouped.size() << "\n" ; 
             }
-            if (t>1000000) break;
+            //if (t>10000000) break;
         }
         seqan3::debug_stream << "\nTotal= " << t  << "\n" ;
         for (auto & gene : genes)
@@ -437,13 +440,13 @@ public:
             std::filesystem::path fasta{input_file.text()};
             if (!std::filesystem::is_regular_file(fasta)) return;  // todo msg
 
-            SplitCoVfasta sp{fasta};
+            SplitCoVfasta sp{fasta, flank.to_int()};
 
             auto Add_Gene = [&sp](auto &g)
             {
             if (g.split.checked() || g.group.checked()) 
                 sp.add_gene(g.gene.text(),     
-                            g.split.checked(), 
+                            g.split.checked(), g.group.checked(), 
                             g.forw.text(),     g.rev.text());
             };
 
