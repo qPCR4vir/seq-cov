@@ -94,6 +94,7 @@ class SplitCoVfasta
 public:    
     using sequence_type = seqan3::dna5_vector;
     using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
+    
 private:
     struct SplitGene
     {
@@ -101,8 +102,11 @@ private:
         bool          split, group,
                       ignore{!(split || group)};
         std::string   gene;
+
+        static constexpr int notfound = std::numeric_limits<int>::lowest(); 
         
         sequence_type forw, rev, target; 
+        int           fw_match, rv_match;
         int           beg{0}, end{0}, len{0}, count{0}; 
         std::string   start{gene+"|"};
         std::unordered_map<sequence_type, SeqGr> grouped; 
@@ -187,7 +191,7 @@ private:
 
             SeqGr sg=set_seq_pos(sq);   // true align to correct position 
             sg.id = record.id();
-            if (sg.beg == -1 || sg.end == -1)
+            if (sg.beg == notfound || sg.end == notfound)
             {
                 sg1.id = std::move(sg.id);
                 sg1.beg = sg.beg ;
@@ -200,12 +204,12 @@ private:
             //                     << " (" << lbeg << ", " << lend  <<")\n" ;
 
             
-            if (sg.end + flank > sq.size())  // todo set this flank as program parameter
+            if (sg.end + flank > sq.size())  
                 lend  = sq.size();     // seq not too long
             else 
                 lend = sg.end + flank ;
 
-            if (sg.beg < flank)  // todo set this flank as program parameter
+            if (sg.beg < flank)  
                 lbeg = 0;
             else 
                 lbeg = sg.beg - flank ;
@@ -238,36 +242,32 @@ private:
             seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
             auto config = method | scheme | gap_costs | output_config;
 
-            /*
-            auto config = seqan3::align_cfg::method_global{
-                    seqan3::align_cfg::free_end_gaps_sequence1_leading{false},    // target seq
-                    seqan3::align_cfg::free_end_gaps_sequence2_leading{true},     // primer
-                    seqan3::align_cfg::free_end_gaps_sequence1_trailing{false},   // target seq
-                    seqan3::align_cfg::free_end_gaps_sequence2_trailing{true}};   // primer
-            */
-            
             auto results = seqan3::align_pairwise(std::tie(s, forw), config);
             auto & res = *results.begin();
             //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
             //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-            //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). "
-                                 ;
+            //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
             
-            if (res.score() > 15)  // forw primer found. todo set this 15 as program parameter
+            if (res.score() > fw_match)  // forw primer found. 
             {
-                sg.beg = res.sequence1_begin_position();   // todo check beg primer align
+                sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;
                 if (len)
                 {
                     sg.end = sg.beg + len;
                     return sg; 
                 }
+                else if (sg.beg < 0)
+                 throw std::runtime_error{"First " + gene + " sequence don't contain 
+                   the full forward primer. Score: " + std::to_string(res.score()) +
+                   " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
             }
             else 
             {
                 if (!len)
-                    throw std::runtime_error{"First " + gene + " sequence don't contain the forward primer"};
+                    throw std::runtime_error{"First " + gene + " sequence don't contain 
+                                             the forward primer. Score: " + std::to_string(res.score() )};
                 else
-                    sg.beg = -1;  // todo ??
+                    sg.beg = notfound;  
             }
             // we need to find rev primer location
 
@@ -275,20 +275,24 @@ private:
             auto & res_r = *res_rev.begin();
             //seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
             //seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-            //seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). "
-                                 ;
+            //seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";
 
-            if (res_r.score() > 15)  // rev primer found. todo set this 15 as program parameter
+            if (res_r.score() > rv_match)  // rev primer found. 
             {   
-                sg.end = res_r.sequence1_end_position() ;  // todo check end primer align
+                sg.end = res_r.sequence1_end_position() + (rev.size() - res_r.sequence2_end_position());
                 if (len)
                     sg.beg = sg.end - len;
+                else if (sg.end > rev.size())
+                 throw std::runtime_error{"First " + gene + " sequence don't contain 
+                   the full reverse primer. Score: " + std::to_string(res.score()) +
+                   " that end at position "  + std::to_string(res.sequence2_end_position())  };
                 return sg;
             }
 
             if (!len)
-                    throw std::runtime_error{"First " + gene + " sequence don't contain the reverse primer"};
-            sg.end = -1;
+                    throw std::runtime_error{"First " + gene + " sequence don't contain 
+                                              the reverse primer. Score: " + std::to_string(res.score() )};
+            sg.end = not_found;
             return sg;
         }
 
@@ -329,7 +333,8 @@ private:
             if (pr.empty()) return *this;
             auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
             forw = seqan3::dna5_vector{e.begin(), e.end()}; 
-            seqan3::debug_stream << "\n from " << pr << ", forw: " << forw;
+            fw_match = std::round(parent.match * double(forw.size()) / 100.0);
+            seqan3::debug_stream << "\n from " << pr << ", forw: " << forw << "min match:" << fw_match;
             return *this;
         }
         SplitGene& set_rev(const std::string& pr)
@@ -337,7 +342,8 @@ private:
             if (pr.empty()) return *this;
             auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
             rev = seqan3::dna5_vector{e.begin(), e.end()}; 
-            seqan3::debug_stream  << " from " << pr << ", rev: " << rev;
+            rv_match = std::round(parent.match * double(rev.size()) / 100.0);
+            seqan3::debug_stream  << " from " << pr << ", rev: " << rev << "min match:" << rv_match;
             return *this;
         }
     };    
@@ -346,12 +352,14 @@ public:
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()};
     int                   flank;
+    double                match;
+
 private:
     std::vector<SplitGene> genes;
 
 public:
-    SplitCoVfasta(const std::filesystem::path& fasta, int flank)
-    : fasta{fasta}, flank{flank}
+    SplitCoVfasta(const std::filesystem::path& fasta, int flank, int match)
+    : fasta{fasta}, flank{flank}, match{match}
     {}
 
     void add_gene(std::string gene, bool split, bool group, std::string fw="", std::string rv="")  // todo implement conditional split
@@ -416,7 +424,8 @@ class GUI: public nana::form
 {
     nana::label    input_file_label{*this, "Original fasta file:"};
     nana::textbox  input_file      {*this};
-    nana::spinbox  flank           {*this};
+    nana::spinbox  flank           {*this},
+                   match           {*this};
     nana::button   set             {*this, "&Select"}, 
                    run_split       {*this, "S&plit" };
     GeneGUI        E               {*this, "E", "ACAggTACgTTAATAgTTAATAgCgT", "CAATATTgCAgCAgTACgCACA"},
@@ -431,6 +440,9 @@ public:
         input_file.tip_string("Original fasta file:").multi_lines(false);
         flank.range(0, 100, 1);
         flank.value("20");
+        match.range(50.0, 100.0, 1.0);
+        match.value("70.0");
+
 
         E.split.check(true);
         N.split.check(true);
@@ -441,7 +453,7 @@ public:
             std::filesystem::path fasta{input_file.text()};
             if (!std::filesystem::is_regular_file(fasta)) return;  // todo msg
 
-            SplitCoVfasta sp{fasta, flank.to_int()};
+            SplitCoVfasta sp{fasta, flank.to_int(), match.to_double()};
 
             auto Add_Gene = [&sp](auto &g)
             {
@@ -471,14 +483,14 @@ public:
 
         auto& p = get_place();
         p.div(R"(<vertical  margin=10 gap=10 min=300
-                    <height=25 input arrange=[variable,35,50, 60, 60] gap=10> 
+                    <height=25 input arrange=[variable,35,50,35,50, 60, 60] gap=10> 
                     <height=10  >
                     <height=30 file >
                     <height=10  >
                     <height=100 vertical genes gap=10> 
                   >   
             )");
-        p["input"] << input_file_label << "Flank:" << flank << set  << run_split ;
+        p["input"] << input_file_label << "Flank:" << flank << "min match %" << match << set  << run_split ;
         p["file"]  << input_file ;
         p["genes"] << E << N << S;
         p.collocate();
