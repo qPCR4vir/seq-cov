@@ -1,5 +1,8 @@
 cmake_minimum_required (VERSION 3.12)
 # set (CMAKE_BUILD_TYPE "Release")
+
+set(CMAKE_CXX_COMPILER C:/Prog/Cpp/MinGW/bin/g++.exe -std=c++20 )
+
 project (seq-cov VERSION 1.00.00 LANGUAGES CXX)
  
 # add seqan3 to search path
