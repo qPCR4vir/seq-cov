@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.12)
 # set (CMAKE_BUILD_TYPE "Release")
-project (seq-cov VERSION 0.01.00 LANGUAGES CXX)
+project (seq-cov VERSION 1.00.00 LANGUAGES CXX)
  
 # add seqan3 to search path
 list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/build_system")

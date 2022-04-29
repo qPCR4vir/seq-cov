@@ -435,7 +435,7 @@ class GUI: public nana::form
 public:
     GUI() : nana::form{nana::api::make_center(1000, 200)}
     {
-        caption("Split-CoV-fasta. v0.01.00");
+        caption("Split-CoV-fasta. v1.00.00");
 
         input_file.tip_string("Original fasta file:").multi_lines(false);
         flank.range(0, 100, 1);
