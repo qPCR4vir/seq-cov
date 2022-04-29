@@ -110,7 +110,7 @@ private:
         int           beg{0}, end{0}, len{0}, count{0}; 
         std::string   start{gene+"|"};
         std::unordered_map<sequence_type, SeqGr> grouped; 
-        sequence_file_output file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};   // todo implement conditional split
+        sequence_file_output file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};   
         
         SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
         : parent{parent}, 
@@ -257,15 +257,15 @@ private:
                     return sg; 
                 }
                 else if (sg.beg < 0)
-                 throw std::runtime_error{"First " + gene + " sequence don't contain 
-                   the full forward primer. Score: " + std::to_string(res.score()) +
+                 throw std::runtime_error{"First " + gene + " sequence don't contain "
+                   "the full forward primer. Score: " + std::to_string(res.score()) +
                    " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
             }
             else 
             {
                 if (!len)
-                    throw std::runtime_error{"First " + gene + " sequence don't contain 
-                                             the forward primer. Score: " + std::to_string(res.score() )};
+                    throw std::runtime_error{"First " + gene + " sequence don't contain "
+                                             "the forward primer. Score: " + std::to_string(res.score() )};
                 else
                     sg.beg = notfound;  
             }
@@ -282,17 +282,17 @@ private:
                 sg.end = res_r.sequence1_end_position() + (rev.size() - res_r.sequence2_end_position());
                 if (len)
                     sg.beg = sg.end - len;
-                else if (sg.end > rev.size())
-                 throw std::runtime_error{"First " + gene + " sequence don't contain 
-                   the full reverse primer. Score: " + std::to_string(res.score()) +
+                else if (sg.end > s.size())
+                 throw std::runtime_error{"First " + gene + " sequence don't contain "
+                   "the full reverse primer. Score: " + std::to_string(res.score()) +
                    " that end at position "  + std::to_string(res.sequence2_end_position())  };
                 return sg;
             }
 
             if (!len)
-                    throw std::runtime_error{"First " + gene + " sequence don't contain 
-                                              the reverse primer. Score: " + std::to_string(res.score() )};
-            sg.end = not_found;
+                    throw std::runtime_error{"First " + gene + " sequence don't contain "
+                                              "the reverse primer. Score: " + std::to_string(res.score() )};
+            sg.end = notfound;
             return sg;
         }
 
@@ -308,7 +308,7 @@ private:
             if (!group) return;  // todo ?????
 
             std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
-            seqan3::debug_stream << "\nGoing to write: " << gr.string();
+            seqan3::debug_stream << "Going to write: " << gr.string() << "\n" ;
             seqan3::sequence_file_output file_e_gr{gr};
             
             std::vector<sgr_p> gr_v;
@@ -334,7 +334,7 @@ private:
             auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
             forw = seqan3::dna5_vector{e.begin(), e.end()}; 
             fw_match = std::round(parent.match * double(forw.size()) / 100.0);
-            seqan3::debug_stream << "\n from " << pr << ", forw: " << forw << "min match:" << fw_match;
+            seqan3::debug_stream << "\n From forward " << pr << " = [ " << forw << " ] with minimum match:" << fw_match;
             return *this;
         }
         SplitGene& set_rev(const std::string& pr)
@@ -343,7 +343,7 @@ private:
             auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
             rev = seqan3::dna5_vector{e.begin(), e.end()}; 
             rv_match = std::round(parent.match * double(rev.size()) / 100.0);
-            seqan3::debug_stream  << " from " << pr << ", rev: " << rev << "min match:" << rv_match;
+            seqan3::debug_stream  << " From reverse " << pr << " = [ "  << rev << " ] with minimum match:" << rv_match;
             return *this;
         }
     };    
@@ -358,7 +358,7 @@ private:
     std::vector<SplitGene> genes;
 
 public:
-    SplitCoVfasta(const std::filesystem::path& fasta, int flank, int match)
+    SplitCoVfasta(const std::filesystem::path& fasta, int flank, double match)
     : fasta{fasta}, flank{flank}, match{match}
     {}
 
@@ -389,11 +389,11 @@ public:
             }
             //if (t>10000000) break;
         }
-        seqan3::debug_stream << "\nTotal= " << t  << "\n" ;
+        seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
         for (auto & gene : genes)
         {
             seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                 << ". Grouped: "    << gene.grouped.size() << "\n" ; 
+                                 << ". Grouped: "    << gene.grouped.size() << ". " ; 
             gene.write_grouped();
         }
 
@@ -443,10 +443,9 @@ public:
         match.range(50.0, 100.0, 1.0);
         match.value("70.0");
 
-
-        E.split.check(true);
-        N.split.check(true);
-        S.split.check(false);
+        E.split.check(false);  E.group.check(true);
+        N.split.check(false);  N.group.check(true);
+        S.split.check(false);  S.group.check(false);
 
         run_split.events().click([&]()
         {
@@ -483,14 +482,14 @@ public:
 
         auto& p = get_place();
         p.div(R"(<vertical  margin=10 gap=10 min=300
-                    <height=25 input arrange=[variable,35,50,35,50, 60, 60] gap=10> 
+                    <height=25 input arrange=[variable,35,50,75,50, 60, 60] gap=10> 
                     <height=10  >
                     <height=30 file >
                     <height=10  >
                     <height=100 vertical genes gap=10> 
                   >   
             )");
-        p["input"] << input_file_label << "Flank:" << flank << "min match %" << match << set  << run_split ;
+        p["input"] << input_file_label << "Flank:" << flank << "Min match %" << match << set  << run_split ;
         p["file"]  << input_file ;
         p["genes"] << E << N << S;
         p.collocate();
