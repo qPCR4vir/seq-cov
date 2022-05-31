@@ -190,10 +190,10 @@ private:
             // new, unknown seq.
 
             SeqGr sg=set_seq_pos(sq);   // true align to correct position 
-            sg.id = record.id();
+            
             if (sg.beg == notfound || sg.end == notfound)
             {
-                sg1.id = std::move(sg.id);
+                sg1.id = record.id();
                 sg1.beg = sg.beg ;
                 sg1.end = sg.end ;
               //  seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
@@ -203,30 +203,30 @@ private:
             //seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
             //                     << " (" << lbeg << ", " << lend  <<")\n" ;
 
+            int nlend= sg.end + flank;
+            if (nlend > sq.size()) nlend = sq.size() ;
             
-            if (sg.end + flank > sq.size())  
-                lend  = sq.size();     // seq not too long
-            else 
-                lend = sg.end + flank ;
+            int nlbeg= sg.beg - flank ;
+            if (nlbeg < 0) nlbeg = 0 ;
 
-            if (sg.beg < flank)  
-                lbeg = 0;
-            else 
-                lbeg = sg.beg - flank ;
+            if (lbeg == nlbeg && lend == nlbeg)  // new seq in the same pos
+            {
+                sg1.id = record.id();
+                sg1.beg = sg.beg - nlbeg;
+                sg1.end = sg.end - nlbeg;
+                return true;
+            }
                 
-            sg.beg = sg.beg - beg;
-            sg.end = sg.end - beg;
-
-            //if (beg <= lbeg && lend <= end) return true; 
+            // new seq in a new pos
 
             grouped.erase(seqan3::dna5_vector{bg, en});
             // seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
-            SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+lbeg, sq.begin()+lend}];
+            SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend}];
             if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
             // seqan3::debug_stream << " It was new !!!!!!!\n" ;
-            sgr.beg = sg.beg;
-            sgr.end = sg.end;
-            sgr.id = sg.id;
+            sgr.beg = sg.beg - nlbeg;
+            sgr.end = sg.end - nlbeg;
+            sgr.id = record.id();
             return true;
         }
         SeqGr set_seq_pos(const seqan3::dna5_vector& s)
