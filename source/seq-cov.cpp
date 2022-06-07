@@ -409,8 +409,23 @@ class GeneGUI: public nana::panel<false>
         gene.multi_lines(false).reset(gene_name);
         forw.tip_string("Seq. forward primer").multi_lines(false).reset(fw);
         rev.tip_string("Seq. reverse primer").multi_lines(false).reset(rv);
-        plc.div(R"( <min=500 all arrange=[35, 60,80,100,180,180] gap=10> )");
-        plc["all"] << "Gene" << gene << split << group << forw << rev ;
+        input_file.tip_string("fasta file with primers").multi_lines(false);
+        set.events().click([&]()
+        {
+            nana::filebox fb{*this, true};
+            fb.title("Select a fasta file with primer sequences for gene " + this->gene);
+            fb.add_filter("fasta file", "*.fasta");
+            const auto&files = fb.show();
+            if (!files.empty())
+            {
+                 this->input_file.reset(files[0].string());
+                 this->forw.reset();
+                 this->rev.rest();
+            }  
+        });
+
+        plc.div(R"( <min=500 all arrange=[35, 60,80,100,180,180,30,200] gap=10> )");
+        plc["all"] << "Gene" << gene << split << group << forw << rev << set << input_file;
         plc.collocate();
     }
     nana::textbox  gene     {*this};  // todo use a combox 
@@ -418,6 +433,8 @@ class GeneGUI: public nana::panel<false>
                    group    {*this, "group target"};
     nana::textbox  forw     {*this};
     nana::textbox  rev      {*this};
+    nana::button   set      {*this, "..."}, 
+    nana::textbox  input_file{*this};
     nana::place    plc      {*this};
 };
 class GUI: public nana::form
@@ -428,8 +445,8 @@ class GUI: public nana::form
                    match           {*this};
     nana::button   set             {*this, "&Select"}, 
                    run_split       {*this, "S&plit" };
-    GeneGUI        E               {*this, "E", "ACAggTACgTTAATAgTTAATAgCgT", "CAATATTgCAgCAgTACgCACA"},
-                   N               {*this, "N", "CCAAAAggCTTCTACgCAgA", "TgCCTggAgTTgAATTTCTTgA"},
+    GeneGUI        E               {*this, "E"},
+                   N               {*this, "N"},
                    S               {*this, "Spike"};
     
 public:
