@@ -12,12 +12,19 @@ list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/bui
 # require seqan3 with a version between >=3.0.0 and <4.0.0
 find_package (seqan3 3.0 REQUIRED)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana" "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/cmake-nana-build-${CMAKE_BUILD_TYPE}" )
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana" 
+                 "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/cmake-nana-build-${CMAKE_BUILD_TYPE}" )
 
- 
 # build app with seqan3
-add_executable (seq-cov source/seq-cov.cpp)
-#set_property(TARGET seq-cov PROPERTY CXX_STANDARD C++20)
+add_executable (seq-cov source/seq-cov.cpp)  
+set_source_files_properties(source/seq-cov.cpp PROPERTIES COMPILE_OPTIONS "-Wa,-mbig-obj")
+if ((CMAKE_COMPILER_IS_MINGW) AND (CMAKE_BUILD_TYPE MATCHES Debug))
+    #  -Wa,-mbig-obj
+    #  -Wa,-mbig-obj
+    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wa,-mbig-obj")
+    set_source_files_properties(source/seq-cov.cpp PROPERTIES COMPILE_OPTIONS "-Wa,-mbig-obj")
+endif()    
+set_property(TARGET seq-cov PROPERTY CXX_STANDARD 20)
 target_link_libraries (seq-cov PUBLIC -static)
 target_link_libraries(seq-cov
         PUBLIC
