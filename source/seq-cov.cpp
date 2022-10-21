@@ -4,10 +4,10 @@
 #include <filesystem>
 //#include <algorithm>
 #include <unordered_map>
-//#include <ranges>
+#include <ranges>
 #include <stdexcept>
 	
-#include <seqan3/std/ranges>                    // include all of the standard library's views
+// #include <seqan3/std/ranges>                    // include all of the standard library's views
 #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
 #include <seqan3/alphabet/hash.hpp>
 #include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
@@ -34,12 +34,15 @@
 #include <nana/gui/tooltip.hpp>
 #include <nana/gui/place.hpp>
 
+/*
 struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 {
     using sequence_alphabet = seqan3::dna15; // instead of dna5
     template <typename alph>
     using sequence_container = seqan3::dna15_vector;
 };
+*/
+
 namespace std
 {
 /*!\brief Struct for hashing a range of characters.
@@ -110,7 +113,7 @@ private:
         int           beg{0}, end{0}, len{0}, count{0}; 
         std::string   start{gene+"|"};
         std::unordered_map<sequence_type, SeqGr> grouped; 
-        sequence_file_output file_fasta_split{parent.dir / (gene + "." + parent.fasta_name)};   
+        sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)).replace_extension("fasta")};   
         
         SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
         : parent{parent}, 
@@ -120,13 +123,14 @@ private:
             //if (split) file_E.open( );  // todo implement conditional split
             std::cout << std::boolalpha  
                 << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
-                << ", gene " << gene <<": " << split << " into "
+                << ", gene " << start << gene <<": " << split << " into "
                 << (parent.dir / (gene + "." + parent.fasta_name)).string();
         }
         
         /// record identified and ...?
         bool check(auto& record)
         {
+            // seqan3::debug_stream << '\n' << record.id();
             if (ignore) return false;
             if (!record.id().starts_with(start)) return false;
             
@@ -174,8 +178,8 @@ private:
                 // todo make sure this first target-sequence is correct !!!!
                 // this will be the "standart" target-sequence
                 
-                seqan3::debug_stream << " Target sequence: " << start << target 
-                                     << " (" << beg << ", "  << end  <<")\n" ;
+                //seqan3::debug_stream << " Target sequence: " << start << target 
+                //                     << " (" << beg << ", "  << end  <<")\n" ;
                 return true; 
             }
 
@@ -196,8 +200,8 @@ private:
                 sg1.id = record.id();
                 sg1.beg = sg.beg ;
                 sg1.end = sg.end ;
-              //  seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
-              //                        << " (" << lbeg << ", " << lend  <<")\n" ;
+                //seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
+                //                      << " (" << lbeg << ", " << lend  <<")\n" ;
                 return true; // todo ???????????????
             }
             //seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
@@ -220,10 +224,10 @@ private:
             // new seq in a new pos
 
             grouped.erase(seqan3::dna5_vector{bg, en});
-            // seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
+            //seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
             SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend}];
             if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
-            // seqan3::debug_stream << " It was new !!!!!!!\n" ;
+            //seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg - nlbeg;
             sgr.end = sg.end - nlbeg;
             sgr.id = record.id();
@@ -334,7 +338,15 @@ private:
             auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
             forw = seqan3::dna5_vector{e.begin(), e.end()}; 
             fw_match = std::round(parent.match * double(forw.size()) / 100.0);
-            seqan3::debug_stream << "\n From forward " << pr << " = [ " << forw << " ] with minimum match:" << fw_match;
+            seqan3::debug_stream << "\n From forward " << pr 
+                                 << " = [ " << forw << " ] with minimum match:" << fw_match;
+            return *this;
+        }
+        SplitGene& set_forw(seqan3::dna5_vector forw)
+        {
+            if (forw.empty()) return *this;
+            fw_match = std::round(parent.match * double(forw.size()) / 100.0);
+            seqan3::debug_stream << "\n From forward = [ " << forw << " ] with minimum match:" << fw_match;
             return *this;
         }
         SplitGene& set_rev(const std::string& pr)
@@ -343,9 +355,16 @@ private:
             auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
             rev = seqan3::dna5_vector{e.begin(), e.end()}; 
             rv_match = std::round(parent.match * double(rev.size()) / 100.0);
-            seqan3::debug_stream  << " From reverse " << pr << " = [ "  << rev << " ] with minimum match:" << rv_match;
+            seqan3::debug_stream  << "\n From reverse " << pr << " = [ "  << rev << " ] with minimum match:" << rv_match;
             return *this;
         }
+        SplitGene& set_rev(seqan3::dna5_vector rev)
+        {
+            if (rev.empty()) return *this;
+            rv_match = std::round(parent.match * double(rev.size()) / 100.0);
+            seqan3::debug_stream  << " From reverse = [ "  << rev << " ] with minimum match:" << rv_match;
+            return *this;
+        }        
     };    
 public:
     std::filesystem::path fasta;
@@ -413,14 +432,34 @@ class GeneGUI: public nana::panel<false>
         set.events().click([&]()
         {
             nana::filebox fb{*this, true};
-            fb.title("Select a fasta file with primer sequences for gene " + this->gene);
+            fb.title("Select a fasta file with primer sequences for gene " + this->gene.text());
             fb.add_filter("fasta file", "*.fasta");
             const auto&files = fb.show();
             if (!files.empty())
             {
                  this->input_file.reset(files[0].string());
-                 this->forw.reset();
-                 this->rev.rest();
+                 seqan3::debug_stream << "\nGoing to load: " << files[0].string();
+                 seqan3::sequence_file_input file_in{files[0]};
+                 std::string fw, rv;
+                 for (auto & primer : file_in)
+                 {
+                    if (fw.empty())
+                    {
+                        seqan3::debug_stream << "\nGoing to convert fw: \n>" 
+                                             << primer.id() << "\n" << primer.sequence();
+                        auto e = primer.sequence() | seqan3::views::to_char;
+                        fw = std::string{e.begin(), e.end()}; 
+                        this->forw.reset(fw);
+                        continue;
+                    }
+                    seqan3::debug_stream << "\nGoing to convert rv: \n>" 
+                                         << primer.id() << "\n" << primer.sequence();
+                    auto e = primer.sequence() | seqan3::views::to_char;
+                    rv = std::string{e.begin(), e.end()}; 
+                    this->rev.reset(rv);
+                    break;
+
+                 }
             }  
         });
 
@@ -433,7 +472,7 @@ class GeneGUI: public nana::panel<false>
                    group    {*this, "group target"};
     nana::textbox  forw     {*this};
     nana::textbox  rev      {*this};
-    nana::button   set      {*this, "..."}, 
+    nana::button   set      {*this, "..."}; 
     nana::textbox  input_file{*this};
     nana::place    plc      {*this};
 };
