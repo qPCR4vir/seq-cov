@@ -239,13 +239,16 @@ private:
             // less than 1% of the seq. May be around 50k?
             SeqGr sg;
             
-            auto output_config = seqan3::align_cfg::output_score{}        | seqan3::align_cfg::output_begin_position{} |
-                                 seqan3::align_cfg::output_end_position{} | seqan3::align_cfg::output_alignment{};
+            auto output_config = seqan3::align_cfg::output_score{}          | 
+                                 seqan3::align_cfg::output_begin_position{} |
+                                 seqan3::align_cfg::output_end_position{}   | 
+                                 seqan3::align_cfg::output_alignment{};
             auto method = seqan3::align_cfg::method_local{};
             seqan3::align_cfg::scoring_scheme scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, seqan3::mismatch_score{-1}}};
             seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
             auto config = method | scheme | gap_costs | output_config;
 
+            // try the fw primer
             auto results = seqan3::align_pairwise(std::tie(s, forw), config);
             auto & res = *results.begin();
             //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
@@ -255,10 +258,10 @@ private:
             if (res.score() > fw_match)  // forw primer found. 
             {
                 sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;
-                if (len)
+                if (len)  // not the first time/seq - the "ref." seq was already set
                 {
                     sg.end = sg.beg + len;
-                    return sg; 
+                    return sg; // only find fw pr pos. Don't count for insertions/deletions or bad rev.
                 }
                 else if (sg.beg < 0)
                  throw std::runtime_error{"First " + gene + " sequence don't contain "
@@ -271,7 +274,7 @@ private:
                     throw std::runtime_error{"First " + gene + " sequence don't contain "
                                              "the forward primer. Score: " + std::to_string(res.score() )};
                 else
-                    sg.beg = notfound;  
+                    sg.beg = notfound;  // mark beg pos as not found !!
             }
             // we need to find rev primer location
 
@@ -296,7 +299,7 @@ private:
             if (!len)
                     throw std::runtime_error{"First " + gene + " sequence don't contain "
                                               "the reverse primer. Score: " + std::to_string(res.score() )};
-            sg.end = notfound;
+            sg.end = notfound;  // mark noth beg and end pos as not found !! Better try to align whole seq?? not sure..
             return sg;
         }
 
@@ -386,6 +389,7 @@ public:
         genes.emplace_back(*this, gene, split, group).set_forw(fw)
                                                      .set_rev (rv);
     }
+
     void split_fasta( )
     {
         // Initialise a file input object with a FASTA file.
@@ -486,7 +490,8 @@ class GUI: public nana::form
                    run_split       {*this, "S&plit" };
     GeneGUI        E               {*this, "E"},
                    N               {*this, "N"},
-                   S               {*this, "Spike"};
+                   S               {*this, "Spike"},
+                   R               {*this, "R"};
     
 public:
     GUI() : nana::form{nana::api::make_center(1000, 200)}
@@ -501,7 +506,7 @@ public:
 
         E.split.check(false);  E.group.check(true);
         N.split.check(false);  N.group.check(true);
-        S.split.check(false);  S.group.check(false);
+        S.split.check(false);  S.group.check(false);  // R
 
         run_split.events().click([&]()
         {
@@ -521,7 +526,7 @@ public:
             // todo implement conditional split
             Add_Gene(E);
             Add_Gene(N);
-            Add_Gene(S);
+            Add_Gene(S);  // Add_Gene(R);
 
             sp.split_fasta();
         });
@@ -547,7 +552,7 @@ public:
             )");
         p["input"] << input_file_label << "Flank:" << flank << "Min match %" << match << set  << run_split ;
         p["file"]  << input_file ;
-        p["genes"] << E << N << S;
+        p["genes"] << E << N << S; // << R;
         p.collocate();
     };
 };
