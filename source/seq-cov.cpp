@@ -125,6 +125,7 @@ private:
                 << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
                 << ", gene " << start << gene <<": " << split << " into "
                 << (parent.dir / (gene + "." + parent.fasta_name)).string();
+            
         }
         
         /// record identified and ...?
@@ -299,7 +300,7 @@ private:
             if (!len)
                     throw std::runtime_error{"First " + gene + " sequence don't contain "
                                               "the reverse primer. Score: " + std::to_string(res.score() )};
-            sg.end = notfound;  // mark noth beg and end pos as not found !! Better try to align whole seq?? not sure..
+            sg.end = notfound;  // mark both beg and end pos as not found !! Better try to align whole seq?? not sure..
             return sg;
         }
 
@@ -372,16 +373,18 @@ private:
 public:
     std::filesystem::path fasta;
     std::filesystem::path dir       {fasta.parent_path()};
-    std::string           fasta_name{fasta.filename().string()};
+    std::string           fasta_name{fasta.filename().string()},
+                          from, to;
     int                   flank;
     double                match;
+    bool                  check_date = !(from.empty() && to.empty());
 
 private:
     std::vector<SplitGene> genes;
 
 public:
-    SplitCoVfasta(const std::filesystem::path& fasta, int flank, double match)
-    : fasta{fasta}, flank{flank}, match{match}
+    SplitCoVfasta(const std::filesystem::path& fasta, int flank, double match, std::string from, std::string to)
+    : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}
     {}
 
     void add_gene(std::string gene, bool split, bool group, std::string fw="", std::string rv="")  // todo implement conditional split
@@ -392,6 +395,7 @@ public:
 
     void split_fasta( )
     {
+        
         // Initialise a file input object with a FASTA file.
         seqan3::sequence_file_input file_in{fasta};
 
@@ -483,7 +487,9 @@ class GeneGUI: public nana::panel<false>
 class GUI: public nana::form
 {
     nana::label    input_file_label{*this, "Original fasta file:"};
-    nana::textbox  input_file      {*this};
+    nana::textbox  input_file      {*this},
+                   from            {*this},
+                   to              {*this};
     nana::spinbox  flank           {*this},
                    match           {*this};
     nana::button   set             {*this, "&Select"}, 
@@ -491,7 +497,8 @@ class GUI: public nana::form
     GeneGUI        E               {*this, "E"},
                    N               {*this, "N"},
                    S               {*this, "Spike"},
-                   R               {*this, "R"};
+                   R               {*this, "NSP12"};
+    
     
 public:
     GUI() : nana::form{nana::api::make_center(1000, 200)}
@@ -513,7 +520,7 @@ public:
             std::filesystem::path fasta{input_file.text()};
             if (!std::filesystem::is_regular_file(fasta)) return;  // todo msg
 
-            SplitCoVfasta sp{fasta, flank.to_int(), match.to_double()};
+            SplitCoVfasta sp{fasta, flank.to_int(), match.to_double(), from.text(), to.text()};
 
             auto Add_Gene = [&sp](auto &g)
             {
@@ -526,7 +533,8 @@ public:
             // todo implement conditional split
             Add_Gene(E);
             Add_Gene(N);
-            Add_Gene(S);  // Add_Gene(R);
+            Add_Gene(S);  
+            Add_Gene(R);
 
             sp.split_fasta();
         });
@@ -547,12 +555,14 @@ public:
                     <height=10  >
                     <height=30 file >
                     <height=10  >
-                    <height=100 vertical genes gap=10> 
+                    <height=133 vertical genes gap=10> 
+                    <height=30 dates gap=10> 
                   >   
             )");
         p["input"] << input_file_label << "Flank:" << flank << "Min match %" << match << set  << run_split ;
         p["file"]  << input_file ;
-        p["genes"] << E << N << S; // << R;
+        p["genes"] << E << N << S << R;
+        p["dates"] << "From date: " << from << " To date: " << to;
         p.collocate();
     };
 };
