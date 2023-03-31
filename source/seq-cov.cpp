@@ -102,9 +102,10 @@ private:
     struct SplitGene
     {
         SplitCoVfasta const &parent;
-        bool          split, group,
-                      ignore{!(split || group)};
-        std::string   gene;
+        bool                split, 
+                            group,  // we are asked to split, group or ignore this?
+                            ignore{!(split || group)};
+        const std::string   gene;
 
         static constexpr int notfound = std::numeric_limits<int>::lowest(); 
         
@@ -161,15 +162,8 @@ private:
                 sg.count = 1;
                 len = sg.end - sg.beg;
 
-                if (sg.end + flank > sq.size())  // todo set this flank as program parameter
-                    end  = sq.size();     // seq not too long
-                else 
-                    end = sg.end + flank ;
-
-                if (sg.beg < flank)  // todo set this flank as program parameter
-                    beg = 0;
-                else 
-                    beg = sg.beg - flank ;
+                end = std::min<int>(sg.end + flank , sq.size()); // seq not too long
+                beg = std::max<int>(0, sg.beg - flank);
                     
                 sg.beg = sg.beg - beg;
                 sg.end = sg.end - beg;
@@ -188,8 +182,8 @@ private:
                 return true; 
             }
 
-            int lend= end > sq.size() ? sq.size() : end;
-            int lbeg= lend - len < beg ? (lend - len < 0 ? 0 : lend - len) : beg ;
+            int lend= std::min<int>(end, sq.size());
+            int lbeg= std::max<int>(  0, std::min(lend - len, beg)) ;
 
             auto bg = sq.begin()+lbeg;
             auto en = sq.begin()+lend;
@@ -202,9 +196,10 @@ private:
             
             if (sg.beg == notfound || sg.end == notfound)
             {
+                // failed, is new in grouped, but we report it for completeneds of staistic ??!
                 sg1.id = record.id();
                 sg1.beg = sg.beg ;
-                sg1.end = sg.end ;
+                sg1.end = sg.end ;  // sg1.count already set to 1
                 //seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
                 //                      << " (" << lbeg << ", " << lend  <<")\n" ;
                 return true; // todo ???????????????
@@ -212,12 +207,9 @@ private:
             //seqan3::debug_stream << start <<  seqan3::dna5_vector{bg, en} 
             //                     << " (" << lbeg << ", " << lend  <<")\n" ;
 
-            int nlend= sg.end + flank;
-            if (nlend > sq.size()) nlend = sq.size() ;
+            int nlend= std::min<int>(sg.end + flank, sq.size() );
+            int nlbeg= std::max<int>(sg.beg - flank, 0);
             
-            int nlbeg= sg.beg - flank ;
-            if (nlbeg < 0) nlbeg = 0 ;
-
             if (lbeg == nlbeg && lend == nlbeg)  // new seq in the same pos
             {
                 sg1.id = id;
