@@ -147,13 +147,17 @@ private:
             const seqan3::dna5_vector &sq = record.sequence();
             count++;
             int flank = parent.flank;
+            // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
+            //           1            212345678910
+            std::string id = std::move(record.id());
 
             if (!len)
             {   
                 // assume the first sequence is OK
                 // todo don't assume the first sequence is OK
-                SeqGr sg=set_seq_pos(sq); 
-                sg.id = record.id();
+
+                SeqGr sg = set_seq_pos(sq); 
+                sg.id    = std::move(id);
                 sg.count = 1;
                 len = sg.end - sg.beg;
 
@@ -216,7 +220,7 @@ private:
 
             if (lbeg == nlbeg && lend == nlbeg)  // new seq in the same pos
             {
-                sg1.id = record.id();
+                sg1.id = id;
                 sg1.beg = sg.beg - nlbeg;
                 sg1.end = sg.end - nlbeg;
                 return true;
@@ -231,7 +235,7 @@ private:
             //seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg - nlbeg;
             sgr.end = sg.end - nlbeg;
-            sgr.id = record.id();
+            sgr.id = id;
             return true;
         }
         SeqGr set_seq_pos(const seqan3::dna5_vector& s)
@@ -321,8 +325,8 @@ private:
             
             std::vector<sgr_p> gr_v;
             gr_v.reserve(grouped.size());
-            for (sgr_t& sgr : grouped)
-                gr_v.push_back(&sgr);
+            for (sgr_t& sgr : grouped) gr_v.push_back(&sgr);
+
             std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)
             {return a->second.count > b->second.count;});
 
