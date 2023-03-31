@@ -372,8 +372,13 @@ private:
             if (!group) return;  // todo ?????
 
             std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
+            std::filesystem::path grd= parent.dir / (gene + ".daily-"   + parent.fasta_name);
+            std::filesystem::path grm= parent.dir / (gene + ".monthly-" + parent.fasta_name);
+
             seqan3::debug_stream << "Going to write: " << gr.string() << "\n" ;
-            seqan3::sequence_file_output file_e_gr{gr};
+            seqan3::sequence_file_output file_e_gr {gr },
+                                         file_e_grd{grd},
+                                         file_e_grm{grm};
             
             std::vector<sgr_p> gr_v;
             gr_v.reserve(grouped.size());
@@ -390,6 +395,29 @@ private:
                          + "_" + sg->second.id ;
                 file_e_gr.push_back(record_t{std::move(sg->first), std::move(id)});
             }
+
+            for(auto& [date, group]: daily)
+                for(auto &[seq, gr] : group)
+                {
+                    auto id = "d_" + date + 
+                         +"_x_"+ std::to_string(gr.count) 
+                         + "_" + std::to_string(gr.beg) 
+                         + "_" + std::to_string(gr.end)
+                         + "_" + gr.id ;
+                    file_e_grd.push_back(record_t{std::move(seq), std::move(id)});
+                }
+
+            for(auto& [date, group]: monthly)
+                for(auto &[seq, gr] : group)
+                {
+                    auto id = "d_" + date + 
+                         +"_x_"+ std::to_string(gr.count) 
+                         + "_" + std::to_string(gr.beg) 
+                         + "_" + std::to_string(gr.end)
+                         + "_" + gr.id ;
+                    file_e_grm.push_back(record_t{std::move(seq), std::move(id)});
+                }
+
         }
         
         SplitGene& set_forw(const std::string& pr)
