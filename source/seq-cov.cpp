@@ -115,6 +115,8 @@ private:
         const std::string   start{gene+"|"};
         using grouped_by_seq = std::unordered_map<sequence_type, SeqGr>;
         grouped_by_seq                                  grouped; 
+        std::unordered_map<std::string, grouped_by_seq> daily,  
+                                                        monthly;
         sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)
                                               ).replace_extension("fasta")};   
         
@@ -154,6 +156,10 @@ private:
             //           1            212345678910
             std::string id = std::move(record.id());
 
+            std::size_t date_beg = id.find('|', 1 + id.find('|')) + 1;       // pos next to 2nd |
+            std::string date     = id.substr(date_beg, 10);
+            std::string month    = id.substr(date_beg,  7);
+
             if (!len)
             {   
                 // assume the first sequence is OK
@@ -174,11 +180,13 @@ private:
                 auto en = sq.begin()+end;
                 target = sequence_type{bg, en};
 
-                grouped[target] = sg;
+                grouped                  [target] = sg ;
+                daily   [std::move(date)][target] = sg ;  // end of date
+                monthly[std::move(month)][target] = sg ;  // end of month 
+
                 // todo what if incomplete ??
                 // todo make sure this first target-sequence is correct !!!!
                 // this will be the "standart" target-sequence
-                
                 //seqan3::debug_stream << " Target sequence: " << start << target 
                 //                     << " (" << beg << ", "  << end  <<")\n" ;
                 return true; 
@@ -193,6 +201,23 @@ private:
 
             SeqGr& sg1 = grouped[cur_seq];  // first try
             if (sg1.count++)  // duplicate seq. More than 99% of cases.
+            {
+                SeqGr& sgd = daily   [date][cur_seq];            
+                if (!sgd.count++) // but it is new in daily
+                {
+                    sgd.id = record.id();
+                    sgd.beg = sg1.beg ;
+                    sgd.end = sg1.end ;
+                }
+                SeqGr& sgm = monthly[month][cur_seq];            
+                if (!sgm.count++)  // but it is new in monthly
+                {
+                    sgm.id = record.id();
+                    sgm.beg = sg1.beg ;
+                    sgm.end = sg1.end ;
+                }
+                return true;
+            }
 
             // new, unknown seq if limited as fisrt. sg1 is a new, blank group already in grouped
 
@@ -204,6 +229,13 @@ private:
                 sg1.id = record.id();
                 sg1.beg = sg.beg ;
                 sg1.end = sg.end ;  // sg1.count already set to 1
+
+                SeqGr& sgd = daily   [date][cur_seq];            
+                if (!sg1.count++) sgd = sg1; 
+
+                SeqGr& sgm = monthly[month][cur_seq];            
+                if (!sgm.count++) sgm = sg1; 
+
                 //seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
                 //                      << " (" << lbeg << ", " << lend  <<")\n" ;
                 return true; // todo ???????????????
@@ -219,6 +251,10 @@ private:
                 sg1.id = id;
                 sg1.beg = sg.beg - nlbeg;
                 sg1.end = sg.end - nlbeg;
+
+                daily   [date][cur_seq] = sg1; 
+                monthly[month][cur_seq] = sg1; 
+
                 return true;
             }
                 
@@ -228,10 +264,30 @@ private:
             auto new_seq = seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend};
             SeqGr& sgr = grouped[new_seq];
             if (sgr.count++) // duplicate seq. More than 99% of cases.
+            {
+                SeqGr& sgd = daily   [date][cur_seq];            
+                if (!sgd.count++) // but it is new in daily
+                {
+                    sgd.id = id;
+                    sgd.beg = sgr.beg ;
+                    sgd.end = sgr.end ;
+                }
+                SeqGr& sgm = monthly[month][cur_seq];            
+                if (!sgm.count++)  // but it is new in monthly
+                {
+                    sgm.id = id;
+                    sgm.beg = sgr.beg ;
+                    sgm.end = sgr.end ;
+                }
+
+                return true;
+            }
             //seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg - nlbeg;
             sgr.end = sg.end - nlbeg;
             sgr.id = id;
+            daily   [date][new_seq] = sgr; 
+            monthly[month][new_seq] = sgr; 
             return true;
         }
         SeqGr set_seq_pos(const seqan3::dna5_vector& s)
