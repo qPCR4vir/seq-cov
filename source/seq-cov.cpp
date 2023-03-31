@@ -491,7 +491,8 @@ class GUI: public nana::form
                    from            {*this},
                    to              {*this};
     nana::spinbox  flank           {*this},
-                   match           {*this};
+                   match           {*this},
+                   period          {*this};
     nana::button   set             {*this, "&Select"}, 
                    run_split       {*this, "S&plit" };
     GeneGUI        E               {*this, "E"},
@@ -501,7 +502,7 @@ class GUI: public nana::form
     
     
 public:
-    GUI() : nana::form{nana::api::make_center(1000, 200)}
+    GUI() : nana::form{nana::api::make_center(1100, 350)}
     {
         caption("Split-CoV-fasta. v1.00.00");
 
@@ -510,6 +511,8 @@ public:
         flank.value("20");
         match.range(50.0, 100.0, 1.0);
         match.value("70.0");
+        period.range(0, 12, 1);
+        period.value("3");
 
         E.split.check(false);  E.group.check(true);
         N.split.check(false);  N.group.check(true);
@@ -550,19 +553,22 @@ public:
         });
 
         auto& p = get_place();
-        p.div(R"(<vertical  margin=10 gap=10 min=300
-                    <height=25 input arrange=[variable,35,50,75,50, 60, 60] gap=10> 
+        p.div(R"(<vertical  margin=10 gap=10 min=350
+                    <height=25 input arrange=[variable, 35,50,  75,50,  60, 60] gap=10> 
                     <height=10  >
                     <height=30 file >
                     <height=10  >
                     <height=133 vertical genes gap=10> 
-                    <height=30 dates gap=10> 
+                    <height=10  >
+                    <height=30 no_dates arrange=[ 35,80,  35,80,  45,40,180] gap=10> 
                   >   
             )");
-        p["input"] << input_file_label << "Flank:" << flank << "Min match %" << match << set  << run_split ;
+        p["input"] << input_file_label << "Flank:"      << flank 
+                                       << "Min match %" << match << set  << run_split ;
         p["file"]  << input_file ;
         p["genes"] << E << N << S << R;
-        p["dates"] << "From date: " << from << " To date: " << to;
+        p["dates"] << "From date: " << from << " To date: " << to
+                   << "Separate by: " << period << " months \n(0 - all time in 1 period).";
         p.collocate();
     };
 };
