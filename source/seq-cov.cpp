@@ -109,12 +109,14 @@ private:
 
         static constexpr int notfound = std::numeric_limits<int>::lowest(); 
         
-        sequence_type forw, rev, target; 
-        int           fw_match, rv_match;
-        int           beg{0}, end{0}, len{0}, count{0}; 
-        std::string   start{gene+"|"};
-        std::unordered_map<sequence_type, SeqGr> grouped; 
-        sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)).replace_extension("fasta")};   
+        sequence_type       forw, rev, target; 
+        int                 fw_match, rv_match;
+        int                 beg{0}, end{0}, len{0}, count{0}; 
+        const std::string   start{gene+"|"};
+        using grouped_by_seq = std::unordered_map<sequence_type, SeqGr>;
+        grouped_by_seq                                  grouped; 
+        sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)
+                                              ).replace_extension("fasta")};   
         
         SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
         : parent{parent}, 
@@ -145,7 +147,7 @@ private:
 
         bool check_rec(auto& record)
         {
-            const seqan3::dna5_vector &sq = record.sequence();
+            sequence_type &sq = record.sequence();
             count++;
             int flank = parent.flank;
             // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
@@ -170,7 +172,7 @@ private:
 
                 auto bg = sq.begin()+beg;
                 auto en = sq.begin()+end;
-                target = seqan3::dna5_vector{bg, en};
+                target = sequence_type{bg, en};
 
                 grouped[target] = sg;
                 // todo what if incomplete ??
@@ -187,12 +189,14 @@ private:
 
             auto bg = sq.begin()+lbeg;
             auto en = sq.begin()+lend;
-            SeqGr& sg1 = grouped[seqan3::dna5_vector{bg, en}];  // first try
-            if (sg1.count++) return true; // duplicate seq. More than 99% of cases.
-            
-            // new, unknown seq.
+            auto cur_seq = seqan3::dna5_vector{bg, en};
 
-            SeqGr sg=set_seq_pos(sq);   // true align to correct position 
+            SeqGr& sg1 = grouped[cur_seq];  // first try
+            if (sg1.count++)  // duplicate seq. More than 99% of cases.
+
+            // new, unknown seq if limited as fisrt. sg1 is a new, blank group already in grouped
+
+            SeqGr sg=set_seq_pos(sq);   // true align to correct position - find limits
             
             if (sg.beg == notfound || sg.end == notfound)
             {
@@ -219,11 +223,11 @@ private:
             }
                 
             // new seq in a new pos
-
-            grouped.erase(seqan3::dna5_vector{bg, en});
+            grouped.erase(cur_seq);
             //seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
-            SeqGr& sgr = grouped[seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend}];
-            if (sgr.count++) return true; // duplicate seq. More than 99% of cases.
+            auto new_seq = seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend};
+            SeqGr& sgr = grouped[new_seq];
+            if (sgr.count++) // duplicate seq. More than 99% of cases.
             //seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg - nlbeg;
             sgr.end = sg.end - nlbeg;
