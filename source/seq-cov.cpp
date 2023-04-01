@@ -416,8 +416,8 @@ private:
             for(auto& [date, group]: monthly)
                 for(auto &[seq, gr] : group)
                 {
-                    auto id = "d_" + date + 
-                         +"_x_"+ std::to_string(gr.count) 
+                    auto id = "m_" + date + 
+                         +"-15_x_"+ std::to_string(gr.count) 
                          + "_" + std::to_string(gr.beg) 
                          + "_" + std::to_string(gr.end)
                          + "_" + gr.id ;
