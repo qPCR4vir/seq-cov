@@ -261,9 +261,11 @@ private:
             // new seq in a new pos
             grouped.erase(cur_seq);
             //seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
-            auto new_seq = seqan3::dna5_vector{sq.begin()+nlbeg, sq.begin()+nlend};
-            SeqGr& sgr = grouped[new_seq];
-            if (sgr.count++) // duplicate seq. More than 99% of cases.
+
+            auto new_seq = sequence_type{sq.begin()+nlbeg, sq.begin()+nlend};
+            SeqGr&   sgr = grouped[new_seq];
+
+            if (sgr.count++)                                // duplicate seq. More than 99% of cases.
             {
                 SeqGr& sgd = daily   [date][cur_seq];            
                 if (!sgd.count++) // but it is new in daily
@@ -290,7 +292,7 @@ private:
             monthly[month][new_seq] = sgr; 
             return true;
         }
-        SeqGr set_seq_pos(const seqan3::dna5_vector& s)
+        SeqGr set_seq_pos(const sequence_type& s)
         {
             // new, unknown seq. We need to find the right position of the target sequence
             // less than 1% of the seq. May be around 50k?
@@ -301,8 +303,10 @@ private:
                                  seqan3::align_cfg::output_end_position{}   | 
                                  seqan3::align_cfg::output_alignment{};
             auto method = seqan3::align_cfg::method_local{};
-            seqan3::align_cfg::scoring_scheme scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, seqan3::mismatch_score{-1}}};
-            seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, seqan3::align_cfg::extension_score{-1}};
+            seqan3::align_cfg::scoring_scheme     scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, 
+                                                         seqan3::mismatch_score{-1}}};
+            seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, 
+                                                         seqan3::align_cfg::extension_score{-1}};
             auto config = method | scheme | gap_costs | output_config;
 
             // try the fw primer
