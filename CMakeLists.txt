@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.12)
 # set(CMAKE_CXX_COMPILER C:/MinGW/bin/g++.exe -std=c++20 )
 # set(CMAKE_CXX_COMPILER "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.31.31103/bin/Hostx64/x64/cl.exe" /std:c++latest )
 
-project (seq-cov VERSION 1.10.00 LANGUAGES CXX)
+project (seq-cov VERSION 1.10.01 LANGUAGES CXX)
  
 # add seqan3 to search path
 list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/build_system")
