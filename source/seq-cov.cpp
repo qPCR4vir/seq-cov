@@ -154,7 +154,7 @@ private:
             int flank = parent.flank;
             // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
             //           1            212345678910
-            std::string id = std::move(record.id());
+            std::string id = std::move(record.id());  // each record is checked only once
 
             std::size_t date_beg = id.find('|', 1 + id.find('|')) + 1;       // pos next to 2nd |
             std::string date     = id.substr(date_beg, 10);
@@ -199,42 +199,41 @@ private:
             auto en = sq.begin()+lend;
             auto cur_seq = seqan3::dna5_vector{bg, en};
 
-            SeqGr& sg1 = grouped[cur_seq];  // first try
-            if (sg1.count++)  // duplicate seq. More than 99% of cases.
+            SeqGr& sg1 = grouped[cur_seq];                // first try
+            if (sg1.count++)                              // count not 0 ==> duplicate seq. More than 99% of cases.
             {
-                SeqGr& sgd = daily   [date][cur_seq];            
-                if (!sgd.count++) // but it is new in daily
+                SeqGr& sgd = daily   [std::move(date)][cur_seq];            
+                if (!sgd.count++)                         // but it is new in daily, count 0 ==> new seq for this day, blank grd 
                 {
-                    sgd.id = record.id();
+                    sgd.id = id;
                     sgd.beg = sg1.beg ;
                     sgd.end = sg1.end ;
                 }
-                SeqGr& sgm = monthly[month][cur_seq];            
-                if (!sgm.count++)  // but it is new in monthly
+                SeqGr& sgm = monthly[std::move(month)][std::move(cur_seq)];  // we are about to return - avoid copy          
+                if (!sgm.count++)                                            // but it is new in monthly
                 {
-                    sgm.id = record.id();
+                    sgm.id = std::move(id);
                     sgm.beg = sg1.beg ;
                     sgm.end = sg1.end ;
                 }
                 return true;
             }
 
-            // new, unknown seq if limited as fisrt. sg1 is a new, blank group already in grouped
+            // new, unknown seq if limited as the first seq. sg1 is a new, blank group that is already in grouped
 
-            SeqGr sg=set_seq_pos(sq);   // true align to correct position - find limits
+            SeqGr sg=set_seq_pos(sq);   // first try to find a true align to correct position - find limits
             
             if (sg.beg == notfound || sg.end == notfound)
             {
-                // failed, is new in grouped, but we report it for completeneds of staistic ??!
-                sg1.id = record.id();
+                // failed!!! NNN??, is new in grouped, but we report it for completeneds of staistic ??!
+                sg1.id = std::move(id);
                 sg1.beg = sg.beg ;
-                sg1.end = sg.end ;  // sg1.count already set to 1
+                sg1.end = sg.end ;                               
+                
+                // sg1.count already set to 1 becouse ir is new in global grouped ==> new in daily and monthly too
 
-                SeqGr& sgd = daily   [date][cur_seq];            
-                if (!sg1.count++) sgd = sg1; 
-
-                SeqGr& sgm = monthly[month][cur_seq];            
-                if (!sgm.count++) sgm = sg1; 
+                daily   [std::move(date)][          cur_seq ] = sg1;            
+                monthly[std::move(month)][std::move(cur_seq)] = sg1;              
 
                 //seqan3::debug_stream  << start <<  seqan3::dna5_vector{bg, en} << " -- Failed! " 
                 //                      << " (" << lbeg << ", " << lend  <<")\n" ;
@@ -246,19 +245,20 @@ private:
             int nlend= std::min<int>(sg.end + flank, sq.size() );
             int nlbeg= std::max<int>(sg.beg - flank, 0);
             
-            if (lbeg == nlbeg && lend == nlbeg)  // new seq in the same pos
+            if (lbeg == nlbeg && lend == nlbeg)  // new seq in the same pos, reuse the positions  ????????
             {
                 sg1.id = id;
                 sg1.beg = sg.beg - nlbeg;
                 sg1.end = sg.end - nlbeg;
 
-                daily   [date][cur_seq] = sg1; 
-                monthly[month][cur_seq] = sg1; 
+                daily   [std::move(date)][          cur_seq ] = sg1;            
+                monthly[std::move(month)][std::move(cur_seq)] = sg1;   
 
                 return true;
             }
                 
-            // new seq in a new pos
+            // new seq in a new pos. Lets make a position correction and try againg. 
+
             grouped.erase(cur_seq);
             //seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
 
@@ -267,29 +267,31 @@ private:
 
             if (sgr.count++)                                // duplicate seq. More than 99% of cases.
             {
-                SeqGr& sgd = daily   [date][cur_seq];            
-                if (!sgd.count++) // but it is new in daily
+                SeqGr& sgd = daily   [std::move(date)][new_seq];            
+                if (!sgd.count++)                           // but it is new in daily
                 {
                     sgd.id = id;
                     sgd.beg = sgr.beg ;
                     sgd.end = sgr.end ;
                 }
-                SeqGr& sgm = monthly[month][cur_seq];            
+                SeqGr& sgm = monthly[std::move(month)][std::move(new_seq)];            
                 if (!sgm.count++)  // but it is new in monthly
                 {
-                    sgm.id = id;
+                    sgm.id = std::move(id);
                     sgm.beg = sgr.beg ;
                     sgm.end = sgr.end ;
                 }
-
                 return true;
             }
+            
             //seqan3::debug_stream << " It was new !!!!!!!\n" ;
             sgr.beg = sg.beg - nlbeg;
             sgr.end = sg.end - nlbeg;
-            sgr.id = id;
-            daily   [date][new_seq] = sgr; 
-            monthly[month][new_seq] = sgr; 
+            sgr.id = std::move(id);
+
+            daily   [std::move(date)][          new_seq ] = sgr;            
+            monthly[std::move(month)][std::move(new_seq)] = sgr;   
+            
             return true;
         }
         SeqGr set_seq_pos(const sequence_type& s)
