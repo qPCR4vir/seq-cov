@@ -139,10 +139,10 @@ private:
             // seqan3::debug_stream << '\n' << record.id();
             if (ignore) return false;
             if (!record.id().starts_with(start)) return false;
-            
-            if (group) check_rec(record);
 
-            if (split) file_fasta_split.push_back(std::move(record));
+            if (split) file_fasta_split.push_back(record);  // todo deprecate
+
+            if (group) check_rec(record);
             
             return true;
         }
