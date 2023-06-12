@@ -18,12 +18,11 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana"
 # build app with seqan3
 add_executable (seq-cov source/seq-cov.cpp)  
 set_source_files_properties(source/seq-cov.cpp PROPERTIES COMPILE_OPTIONS "-Wa,-mbig-obj")
-if ((CMAKE_COMPILER_IS_MINGW) AND (CMAKE_BUILD_TYPE MATCHES Debug))
-    #  -Wa,-mbig-obj
-    #  -Wa,-mbig-obj
-    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-Wa,-mbig-obj")
-    set_source_files_properties(source/seq-cov.cpp PROPERTIES COMPILE_OPTIONS "-Wa,-mbig-obj")
-endif()    
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
 set_property(TARGET seq-cov PROPERTY CXX_STANDARD 20)
 target_link_libraries (seq-cov PUBLIC -static)
 target_link_libraries(seq-cov

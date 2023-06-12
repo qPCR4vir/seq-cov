@@ -156,8 +156,8 @@ private:
             //           1            212345678910
             std::string id = std::move(record.id());  // each record is checked only once
 
-            std::size_t date_beg = id.find('|', 1 + id.find('|')) + 1;       // pos next to 2nd |
-            std::string date     = id.substr(date_beg, 10);
+            std::size_t date_beg = id.find('|', 1 + id.find('|')) + 1;           // pos next to 2nd |
+            std::string date     = id.substr(date_beg, id.find('|', date_beg) - date_beg);  // 9 or 10
             std::string month    = id.substr(date_beg,  7);
 
             if (!len)
@@ -363,6 +363,8 @@ private:
                     throw std::runtime_error{"First " + gene + " sequence don't contain "
                                               "the reverse primer. Score: " + std::to_string(res.score() )};
             sg.end = notfound;  // mark both beg and end pos as not found !! Better try to align whole seq?? not sure..
+            // todo  align with ref_seq
+
             return sg;
         }
 
@@ -594,7 +596,7 @@ class GUI: public nana::form
 public:
     GUI() : nana::form{nana::api::make_center(1100, 350)}
     {
-        caption("Split-CoV-fasta. v1.00.00");
+        caption("Split-CoV-fasta. v2.00.00");
 
         input_file.tip_string("Original fasta file:").multi_lines(false);
         flank.range(0, 100, 1);
