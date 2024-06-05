@@ -16,8 +16,12 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana"
                  "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/cmake-nana-build-${CMAKE_BUILD_TYPE}" )
 
 # build app with seqan3
-add_executable (seq-cov source/seq-cov.cpp)  
+add_executable (seq-cov source/main.cpp 
+                        source/seq-cov.cpp
+                        source/gui.cpp)  
+
 set_source_files_properties(source/seq-cov.cpp PROPERTIES COMPILE_OPTIONS "-Wa,-mbig-obj")
+
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if(COMPILER_SUPPORTS_MARCH_NATIVE)
