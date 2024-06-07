@@ -72,7 +72,7 @@ class SplitCoVfasta
     {
         sequence_type seq;
         std::string   name, code;
-        int           beg{0}, end{0};
+        int           beg{0}, end{0}, match{0};
     };
 
     struct SplitGene
@@ -92,7 +92,7 @@ class SplitCoVfasta
         static constexpr int notfound = std::numeric_limits<int>::lowest(); 
         
 
-        int                 fw_match, rv_match;
+        int                 fw_match, rv_match;     // deprecate
         int                 beg{0}, end{0}, len{0}, count{0}; 
         const std::string   start{gene+"|"};
 

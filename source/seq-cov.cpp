@@ -73,6 +73,8 @@ bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oli
             // todo check if beg, end are valid
             seqan3::debug_stream << " with beg: " << pr.beg << " and end: " << pr.end;
             pr.seq  = primer.sequence();
+            pr.match = std::round(parent.match * double(pr.seq.size()) / 100.0);
+            seqan3::debug_stream << " with minimum matches:" << pr.match;
 
             if (pr.beg < pr.end)  // one forward primer/prbe
             {
@@ -396,40 +398,6 @@ void SplitCoVfasta::SplitGene::write_grouped ()
 
 }
         
-SplitCoVfasta::SplitGene& SplitCoVfasta::SplitGene::set_forw(const std::string& pr)
-{
-    if (pr.empty()) return *this;
-    auto e = pr | seqan3::views::char_to<seqan3::dna5> ;
-    forw = seqan3::dna5_vector{e.begin(), e.end()}; 
-    fw_match = std::round(parent.match * double(forw.size()) / 100.0);
-    seqan3::debug_stream << "\n From forward " << pr 
-                            << " = [ " << forw << " ] with minimum match:" << fw_match;
-    return *this;
-}
-SplitCoVfasta::SplitGene& SplitCoVfasta::SplitGene::set_forw(seqan3::dna5_vector forw)
-{
-    if (forw.empty()) return *this;
-    fw_match = std::round(parent.match * double(forw.size()) / 100.0);
-    seqan3::debug_stream << "\n From forward = [ " << forw << " ] with minimum match:" << fw_match;
-    return *this;
-}
-SplitCoVfasta::SplitGene& SplitCoVfasta::SplitGene::set_rev(const std::string& pr)
-{
-    if (pr.empty()) return *this;
-    auto e = pr | seqan3::views::char_to<seqan3::dna5> | std::views::reverse | seqan3::views::complement ; 
-    rev = seqan3::dna5_vector{e.begin(), e.end()}; 
-    rv_match = std::round(parent.match * double(rev.size()) / 100.0);
-    seqan3::debug_stream  << "\n From reverse " << pr << " = [ "  << rev << " ] with minimum match:" << rv_match;
-    return *this;
-}
-SplitCoVfasta::SplitGene& SplitCoVfasta::SplitGene::set_rev(seqan3::dna5_vector rev)
-{
-    if (rev.empty()) return *this;
-    rv_match = std::round(parent.match * double(rev.size()) / 100.0);
-    seqan3::debug_stream  << " From reverse = [ "  << rev << " ] with minimum match:" << rv_match;
-    return *this;
-}        
-
 // class SplitCoVfasta
  
 void SplitCoVfasta::split_fasta( )
