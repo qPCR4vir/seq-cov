@@ -79,7 +79,8 @@ class SplitCoVfasta
     {
         SplitCoVfasta const &parent;
         const std::string   gene;
-        sequence_type       forw, rev, target;      // deprecate
+        sequence_type       target;      
+        int                 forw_idx{}, rev_idx{}; 
         std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
 
         bool read_oligos(const std::filesystem::path& oligos);

@@ -55,7 +55,7 @@ bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oli
         seqan3::debug_stream << "\nGoing to load: " << path_oligos.string();
         seqan3::sequence_file_input file_in{path_oligos};
         std::string fw, rv;
-        int fw_beg{0}, fw_end{0}, rv_beg{0}, rv_end{0};
+        beg = end = 0;
         for (auto & primer : file_in)
         {
             std::string id = std::move(primer.id());
@@ -78,22 +78,22 @@ bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oli
 
             if (pr.beg < pr.end)  // one forward primer/prbe
             {
-                f_primers.push_back(pr);
-                if (fw_beg == 0 || beg < fw_beg)
+                if ( !beg || beg > pr.beg)  // extern forward primer
                 {
-                    fw_beg = beg;
-                    fw_end = end;
-                }                        
+                    beg = pr.beg;
+                    forw_idx = f_primers.size();
+                }   
+                f_primers.push_back(pr);                     
                 continue;
             }
             else  // one reverse primer/prbe
             {
-                r_primers.push_back(pr);
-                if (rv_beg == 0 || beg > rv_beg)
+                if ( !end || end < pr.end)  // extern reverse primer
                 {
-                    rv_beg = beg;
-                    rv_end = end;
+                    end = pr.end;
+                    rev_idx = r_primers.size();
                 }
+                r_primers.push_back(pr);
                 continue;
             }
         }
