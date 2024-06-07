@@ -99,32 +99,51 @@ GeneGUI::GeneGUI(nana::window parent, std::string gene_name, std::string fw, std
             fb.title("Select a fasta file with primer sequences for gene " + this->gene.text());
             fb.add_filter("fasta file", "*.fasta");
             const auto&files = fb.show();
-            if (!files.empty())
+            if (files.empty()) return;   
+            
+            this->input_file.reset(files[0].string());
+            seqan3::debug_stream << "\nGoing to load: " << files[0].string();
+            seqan3::sequence_file_input file_in{files[0]};
+            std::string fw, rv;
+            int fw_beg{0}, fw_end{0}, rv_beg{0}, rv_end{0};
+            for (auto & primer : file_in)
             {
-                 this->input_file.reset(files[0].string());
-                 seqan3::debug_stream << "\nGoing to load: " << files[0].string();
-                 seqan3::sequence_file_input file_in{files[0]};
-                 std::string fw, rv;
-                 for (auto & primer : file_in)
-                 {
-                    if (fw.empty())
+                std::string id = std::move(primer.id());
+                seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
+
+                // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
+                std::string seq_pos = id.substr(id.find("Seq pos: ") + 9);
+                size_t dash_pos = seq_pos.find("-");
+                int beg = std::stoi(seq_pos.substr(0, dash_pos));
+                int end = std::stoi(seq_pos.substr(dash_pos + 1));
+                // todo check if beg, end are valid
+                seqan3::debug_stream << " with beg: " << beg << " and end: " << end;
+
+                if (beg < end)  // one forward primer/prbe
+                {
+                    if (fw_beg == 0 || beg < fw_beg)
                     {
-                        seqan3::debug_stream << "\nGoing to convert fw: \n>" 
-                                             << primer.id() << "\n" << primer.sequence();
+                        fw_beg = beg;
+                        fw_end = end;
                         auto e = primer.sequence() | seqan3::views::to_char;
                         fw = std::string{e.begin(), e.end()}; 
                         this->forw.reset(fw);
-                        continue;
+                    }                        
+                    continue;
+                }
+                else  // one reverse primer/prbe
+                {
+                    if (rv_beg == 0 || beg > rv_beg)
+                    {
+                        rv_beg = beg;
+                        rv_end = end;
+                        auto e = primer.sequence() | seqan3::views::to_char;
+                        rv = std::string{e.begin(), e.end()}; 
+                        this->rev.reset(rv);
                     }
-                    seqan3::debug_stream << "\nGoing to convert rv: \n>" 
-                                         << primer.id() << "\n" << primer.sequence();
-                    auto e = primer.sequence() | seqan3::views::to_char;
-                    rv = std::string{e.begin(), e.end()}; 
-                    this->rev.reset(rv);
-                    break;
-
-                 }
-            }  
+                    continue;
+                }
+            }
         });
 
         plc.div(R"( <min=500 all arrange=
