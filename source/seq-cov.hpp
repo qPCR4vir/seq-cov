@@ -10,7 +10,6 @@
 #include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
 #include <seqan3/core/debug_stream.hpp>         // for debug_stream
 
-
 namespace std
 {
 /*!\brief Struct for hashing a range of characters.
@@ -54,9 +53,6 @@ struct hash<urng_t>
 } // namespace std
 
 
-
-
-
 struct SeqGr
 {
     int count{0};
@@ -64,25 +60,38 @@ struct SeqGr
     std::string id;
 };
 
-
 class SplitCoVfasta
 {
-public:    
+ public:    
     using sequence_type = seqan3::dna5_vector;
     using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
     
-private:
+ private:
+
+    struct oligo
+    {
+        sequence_type seq;
+        std::string   name, code;
+        int           beg{0}, end{0};
+    };
+
     struct SplitGene
     {
         SplitCoVfasta const &parent;
+        const std::string   gene;
+        sequence_type       forw, rev, target;      // deprecate
+        std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
+
+        bool read_oligos(const std::filesystem::path& oligos);
+
         bool                split, 
                             group,  // we are asked to split, group or ignore this?
                             ignore{!(split || group)};
-        const std::string   gene;
+        
 
         static constexpr int notfound = std::numeric_limits<int>::lowest(); 
         
-        sequence_type       forw, rev, target; 
+
         int                 fw_match, rv_match;
         int                 beg{0}, end{0}, len{0}, count{0}; 
         const std::string   start{gene+"|"};
@@ -96,7 +105,10 @@ private:
         sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)
                                               ).replace_extension("fasta")};   
         
-        SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group);
+        SplitGene( SplitCoVfasta const &parent, 
+                              std::string gene, 
+                                    bool split, 
+                                    bool group);
         
         /// record identified and ...?
         bool check(auto& record);
@@ -106,11 +118,6 @@ private:
         SeqGr set_seq_pos(const sequence_type& s);
 
         void write_grouped ();
-        
-        SplitGene& set_forw(const  std::string&   pr  );
-        SplitGene& set_forw(seqan3::dna5_vector   forw);
-        SplitGene& set_rev (const  std::string&   pr  );
-        SplitGene& set_rev (seqan3::dna5_vector   rev );
     };    
 
  public:
@@ -136,10 +143,10 @@ private:
     : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}, full_msa{full_msa}
     {}
 
-    void add_gene(std::string gene, bool split, bool group, std::string fw="", std::string rv="")  // todo implement conditional split
+    void add_gene(const std::filesystem::path& oligos, std::string gene, bool split, bool group, 
+                     std::string fw="", std::string rv="")  // todo implement conditional split
     {
-        genes.emplace_back(*this, gene, split, group).set_forw(fw)
-                                                     .set_rev (rv);
+        genes.emplace_back(*this, gene, split, group, oligos).read_oligos(oligos);
     }
 
     void split_fasta( );

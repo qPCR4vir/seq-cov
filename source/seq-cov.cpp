@@ -20,10 +20,6 @@
 #include <seqan3/alignment/pairwise/align_pairwise.hpp>
 #include <seqan3/alignment/configuration/align_config_edit.hpp>
 
-
-
-
-
 #include "seq-cov.hpp"
 
 /*
@@ -43,6 +39,7 @@ SplitCoVfasta::SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gen
           gene{gene}, 
           split{split}, group{group}
 {
+    
     //if (split) file_E.open( );  // todo implement conditional split
     std::cout << std::boolalpha  
         << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
@@ -50,8 +47,58 @@ SplitCoVfasta::SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gen
         << (parent.dir / (gene + "." + parent.fasta_name)).string();
     
 }
-        
-bool SplitCoVfasta::SplitGene::check(auto& record)  /// record identified and ...?
+
+bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oligos)
+{
+        if (path_oligos.empty()) return false;   // todo: more checks?
+
+        seqan3::debug_stream << "\nGoing to load: " << path_oligos.string();
+        seqan3::sequence_file_input file_in{path_oligos};
+        std::string fw, rv;
+        int fw_beg{0}, fw_end{0}, rv_beg{0}, rv_end{0};
+        for (auto & primer : file_in)
+        {
+            std::string id = std::move(primer.id());
+            seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
+
+            // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
+            oligo pr;
+            std::stringstream ss{id};
+            ss >> pr.name >> pr.code ;
+
+            std::string seq_pos = id.substr(id.find("Seq pos: ") + 9);
+            size_t dash_pos = seq_pos.find("-");
+            pr.beg = std::stoi(seq_pos.substr(0, dash_pos));
+            pr.end = std::stoi(seq_pos.substr(dash_pos + 1));
+            // todo check if beg, end are valid
+            seqan3::debug_stream << " with beg: " << pr.beg << " and end: " << pr.end;
+            pr.seq  = primer.sequence();
+
+            if (pr.beg < pr.end)  // one forward primer/prbe
+            {
+                f_primers.push_back(pr);
+                if (fw_beg == 0 || beg < fw_beg)
+                {
+                    fw_beg = beg;
+                    fw_end = end;
+                }                        
+                continue;
+            }
+            else  // one reverse primer/prbe
+            {
+                r_primers.push_back(pr);
+                if (rv_beg == 0 || beg > rv_beg)
+                {
+                    rv_beg = beg;
+                    rv_end = end;
+                }
+                continue;
+            }
+        }
+        return true;
+}
+
+bool check(auto& record)  /// record identified and ...?
 {
     // seqan3::debug_stream << '\n' << record.id();
     if (ignore) return false;
