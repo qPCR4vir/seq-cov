@@ -112,21 +112,28 @@ private:
         SplitGene& set_rev (const  std::string&   pr  );
         SplitGene& set_rev (seqan3::dna5_vector   rev );
     };    
-public:
+
+ public:
     std::filesystem::path fasta;
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()},
                           from, to;
     int                   flank;
     double                match;
-    bool                  check_date = !(from.empty() && to.empty());
+    bool                  check_date = !(from.empty() && to.empty()), 
+                          full_msa   = true;
 
-private:
+ private:
     std::vector<SplitGene> genes;
 
-public:
-    SplitCoVfasta(const std::filesystem::path& fasta, int flank, double match, std::string from, std::string to)
-    : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}
+ public:
+    SplitCoVfasta(const std::filesystem::path& fasta,
+                                       bool full_msa, 
+                                           int flank, 
+                                        double match, 
+                                    std::string from, 
+                                    std::string to)
+    : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}, full_msa{full_msa}
     {}
 
     void add_gene(std::string gene, bool split, bool group, std::string fw="", std::string rv="")  // todo implement conditional split

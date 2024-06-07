@@ -15,10 +15,11 @@
 #include "gui.hpp"
 #include "seq-cov.hpp"
 
-GUI::GUI() : nana::form{nana::api::make_center(1100, 350)}
+GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
 {
-    caption("Split-CoV-fasta. v2.01.00");
+    caption("Split-CoV-fasta. v3.00.00");
 
+    full_msa.check(true);
     input_file.tip_string("Original fasta file:").multi_lines(false);
     flank.range(0, 100, 1);
     flank.value("20");
@@ -36,7 +37,7 @@ GUI::GUI() : nana::form{nana::api::make_center(1100, 350)}
         std::filesystem::path fasta{input_file.text()};
         if (!std::filesystem::is_regular_file(fasta)) return;  // todo msg
 
-        SplitCoVfasta sp{fasta, flank.to_int(), match.to_double(), from.text(), to.text()};
+        SplitCoVfasta sp{fasta, full_msa.checked(), flank.to_int(), match.to_double(), from.text(), to.text()};
 
         auto Add_Gene = [&sp](auto &g)
         {
@@ -67,7 +68,7 @@ GUI::GUI() : nana::form{nana::api::make_center(1100, 350)}
 
     auto& p = get_place();
     p.div(R"(<vertical  margin=10 gap=10 min=350
-                <height=25 input arrange=[variable, 35,50,  75,50,  60, 60] gap=10> 
+                <height=25 input arrange=[variable, 100, 35, 50,  75,50,  60, 60] gap=7> 
                 <height=10  >
                 <height=30 file >
                 <height=10  >
@@ -76,12 +77,12 @@ GUI::GUI() : nana::form{nana::api::make_center(1100, 350)}
                 <height=30 no_dates arrange=[ 35,80,  35,80,  45,40,180] gap=10> 
                 >   
         )");
-    p["input"] << input_file_label << "Flank:"      << flank 
-                                    << "Min match %" << match << set  << run_split ;
+    p["input"] << input_file_label << full_msa      << "Flank:"  << flank 
+                                   << "Min match %" << match     << set  << run_split ;
     p["file"]  << input_file ;
     p["genes"] << E << N << S << R;
     p["dates"] << "From date: " << from << " To date: " << to
-                << "Separate by: " << period << " months \n(0 - all time in 1 period).";
+               << "Separate by: " << period << " months \n(0 - all time in 1 period).";
     p.collocate();
 };
 
@@ -90,7 +91,7 @@ GeneGUI::GeneGUI(nana::window parent, std::string gene_name, std::string fw, std
     {
         gene.multi_lines(false).reset(gene_name);
         forw.tip_string("Seq. forward primer").multi_lines(false).reset(fw);
-        rev.tip_string("Seq. reverse primer").multi_lines(false).reset(rv);
+        rev .tip_string("Seq. reverse primer").multi_lines(false).reset(rv);
         input_file.tip_string("fasta file with primers").multi_lines(false);
         set.events().click([&]()
         {
@@ -126,7 +127,8 @@ GeneGUI::GeneGUI(nana::window parent, std::string gene_name, std::string fw, std
             }  
         });
 
-        plc.div(R"( <min=500 all arrange=[35, 60,80,100,180,180,30,200] gap=10> )");
+        plc.div(R"( <min=500 all arrange=
+                       [27,     50,     50,      60,     200,    200,   30,     variable] gap=7> )");
         plc["all"] << "Gene" << gene << split << group << forw << rev << set << input_file;
         plc.collocate();
     }

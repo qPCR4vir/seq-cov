@@ -55,9 +55,12 @@ bool SplitCoVfasta::SplitGene::check(auto& record)  /// record identified and ..
 {
     // seqan3::debug_stream << '\n' << record.id();
     if (ignore) return false;
-    if (!record.id().starts_with(start)) return false;
+    if (!full_msa)
+    {
+        if (!record.id().starts_with(start)) return false;
 
-    if (split) file_fasta_split.push_back(record);  // todo deprecate
+        if (split) file_fasta_split.push_back(record);  // todo deprecate
+    }
 
     if (group) check_rec(record);
     
@@ -391,25 +394,28 @@ void SplitCoVfasta::split_fasta( )
     long t{0L}, m{(1L<<18)-1};
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
-    for (auto & record : file_in)
+    for (auto & record : file_in)             // read each sequence in the file
     {
-        for (auto & gene : genes)
-                if (gene.check(record)) break;
+        for (auto & gene : genes)             // for each sequence, check each gene/target
+            if (gene.check(record)) 
+                break;
 
-        if (!(++t & m)) 
+        if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
+            seqan3::debug_stream << '.' ;
         {
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
             for (auto & gene : genes)
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                    << ". Grouped: "    << gene.grouped.size() << "\n" ; 
+                                     << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
         //if (t>10000000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
-    for (auto & gene : genes)
+
+    for (auto & gene : genes)                // write grouped sequences for each gene/target
     {
         seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                << ". Grouped: "    << gene.grouped.size() << ". " ; 
+                             << ". Grouped: "    << gene.grouped.size() << ". " ; 
         gene.write_grouped();
     }
 
