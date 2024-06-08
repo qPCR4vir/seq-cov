@@ -14,7 +14,7 @@
 
 #include "gui.hpp"
 #include "seq-cov.hpp"
-
+using namespace cov;
 GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
 {
     caption("Split-CoV-fasta. v3.00.00");

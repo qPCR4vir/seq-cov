@@ -52,6 +52,8 @@ struct hash<urng_t>
 };
 } // namespace std
 
+namespace cov
+{
 
 struct SeqGr
 {
@@ -60,63 +62,74 @@ struct SeqGr
     std::string id;
 };
 
-class SplitCoVfasta
 {
  public:    
     using sequence_type = seqan3::dna5_vector;
     using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
-    
- private:
 
-    struct oligo
-    {
-        sequence_type seq;
-        std::string   name, code;
+struct oligo
+{
+    oligo_seq_t   seq;
+    std::string   name, code;
+    int           beg{0}, end{0}, match{0};
+};
+
+class SplitCoVfasta;
+struct SplitGene
+{
+    SplitCoVfasta const &parent;
+    const std::string   gene;
+    int                 forw_idx{}, rev_idx{};    
+    std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
+
+    bool read_oligos(const std::filesystem::path& oligos);
+
+    bool                split, 
+                        group,  // we are asked to split, group or ignore this?
+                        ignore{!(split || group)};
+    
+
         int           beg{0}, end{0}, match{0};
     };
 
-    struct SplitGene
-    {
-        SplitCoVfasta const &parent;
-        const std::string   gene;
-        sequence_type       target;      
-        int                 forw_idx{}, rev_idx{}; 
-        std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
+    int                 fw_match, rv_match;     // deprecate
+    msa_seq_t           target;      
+    std::vector<int>    msa_target_pos;
+    int                 beg{0}, end{0}, len{0}, count{0}; 
+    const std::string   start{gene+"|"};
 
-        bool read_oligos(const std::filesystem::path& oligos);
+    using grouped_by_seq = std::unordered_map<msa_seq_t, SeqGr>;
 
-        bool                split, 
-                            group,  // we are asked to split, group or ignore this?
-                            ignore{!(split || group)};
-        
+    grouped_by_seq                                  grouped; 
+    std::unordered_map<std::string, grouped_by_seq> daily,  
+                                                    monthly;
 
-        static constexpr int notfound = std::numeric_limits<int>::lowest(); 
-        
+    //sequence_file_output file_fasta_split;   
+    
+    SplitGene( SplitCoVfasta const &parent, 
+                            std::string gene, 
+                                bool split, 
+                                bool group);
+    
+    /// record identified and ...?
+    bool check(auto& record);
 
-        int                 fw_match, rv_match;     // deprecate
-        int                 beg{0}, end{0}, len{0}, count{0}; 
-        const std::string   start{gene+"|"};
+    bool check_rec(auto& record);
 
-        using grouped_by_seq = std::unordered_map<sequence_type, SeqGr>;
+    SeqGr set_seq_pos(const msa_seq_t& s);
 
-        grouped_by_seq                                  grouped; 
-        std::unordered_map<std::string, grouped_by_seq> daily,  
-                                                        monthly;
+    bool reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
+                            int& beg, int& end, std::vector<int>& msa_pos, int tent_len);
 
-        sequence_file_output file_fasta_split{(parent.dir / (gene + "." + parent.fasta_name)
-                                              ).replace_extension("fasta")};   
-        
-        SplitGene( SplitCoVfasta const &parent, 
-                              std::string gene, 
-                                    bool split, 
-                                    bool group);
-        
-        /// record identified and ...?
-        bool check(auto& record);
+    void write_grouped ();
+};    
 
         bool check_rec(auto& record);
 
         SeqGr set_seq_pos(const sequence_type& s);
+class SplitCoVfasta
+{
+ public:    
 
         void write_grouped ();
     };    
@@ -152,4 +165,5 @@ class SplitCoVfasta
 
     void split_fasta( );
 };
- 
+
+} // namespace cov

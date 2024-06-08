@@ -22,6 +22,8 @@
 
 #include "seq-cov.hpp"
 
+namespace cov
+{
 /*
 struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 {
@@ -34,7 +36,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-SplitCoVfasta::SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
+SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
         : parent{parent}, 
           gene{gene}, 
           split{split}, group{group}
@@ -48,7 +50,7 @@ SplitCoVfasta::SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gen
     
 }
 
-bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oligos)
+bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 {
         if (path_oligos.empty()) return false;   // todo: more checks?
 
@@ -100,7 +102,7 @@ bool SplitCoVfasta::SplitGene::read_oligos(const std::filesystem::path& path_oli
         return true;
 }
 
-bool check(auto& record)  /// record identified and ...?
+bool SplitGene::check(auto& record)  /// record identified and ...?
 {
     // seqan3::debug_stream << '\n' << record.id();
     if (ignore) return false;
@@ -116,9 +118,10 @@ bool check(auto& record)  /// record identified and ...?
     return true;
 }
 
-bool SplitCoVfasta::SplitGene::check_rec(auto& record)
 {
     sequence_type &sq = record.sequence();
+bool SplitGene::check_rec(auto& record)
+{
     count++;
     int flank = parent.flank;
     // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
@@ -338,9 +341,8 @@ SeqGr SplitCoVfasta::SplitGene::set_seq_pos(const sequence_type& s)
     return sg;
 }
 
-void SplitCoVfasta::SplitGene::write_grouped ()
+void SplitGene::write_grouped ()
 {
-    
     using types = seqan3::type_list<std::vector<seqan3::dna5>, std::string>;
     using fields = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
     using record_t = seqan3::sequence_record<types, fields>;
