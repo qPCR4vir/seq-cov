@@ -110,7 +110,15 @@ bool SplitGene::check(auto& record)  /// record identified and ...?
     {
         if (!record.id().starts_with(start)) return false;
 
-        if (split) file_fasta_split.push_back(record);  // todo deprecate
+        if (split) 
+        {/*if (!file_fasta_split) // todo deprecate
+            {
+                file_fasta_split = sequence_file_output{(parent.dir / (gene + "." + parent.fasta_name)
+                                            ).replace_extension("fasta")};   
+            }
+            file_fasta_split.push_back(record); 
+         */
+        }
     }
 
     if (group) check_rec(record);
