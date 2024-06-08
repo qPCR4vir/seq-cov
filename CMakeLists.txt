@@ -8,6 +8,20 @@ project (seq-cov VERSION 1.10.02 LANGUAGES CXX)
  
 # add seqan3 to search path
 list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/build_system")
+list (APPEND CMAKE_PREFIX_PATH "C:/MinGW/include")
+list (APPEND CMAKE_PREFIX_PATH "C:/MinGW/lib")
+
+find_package (ZLIB QUIET)
+
+if (ZLIB_FOUND)
+    set (SEQAN3_LIBRARIES ${SEQAN3_LIBRARIES} ${ZLIB_LIBRARIES})
+    set (SEQAN3_DEPENDENCY_INCLUDE_DIRS ${SEQAN3_DEPENDENCY_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
+    set (SEQAN3_DEFINITIONS ${SEQAN3_DEFINITIONS} "-DSEQAN3_HAS_ZLIB=1")
+    message ("Optional dependency:        ZLIB-${ZLIB_VERSION_STRING} found.")
+else ()
+    message ("Optional dependency:        ZLIB not found.")
+endif ()
+
  
 # require seqan3 with a version between >=3.0.0 and <4.0.0
 find_package (seqan3 3.0 REQUIRED)
