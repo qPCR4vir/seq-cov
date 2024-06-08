@@ -55,7 +55,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         if (path_oligos.empty()) return false;   // todo: more checks?
 
         seqan3::debug_stream << "\nGoing to load: " << path_oligos.string();
-        seqan3::sequence_file_input file_in{path_oligos};
+        seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
         beg = end = 0;
         for (auto & primer : file_in)
@@ -106,7 +106,7 @@ bool SplitGene::check(auto& record)  /// record identified and ...?
 {
     // seqan3::debug_stream << '\n' << record.id();
     if (ignore) return false;
-    if (!full_msa)
+    if (!parent.full_msa)
     {
         if (!record.id().starts_with(start)) return false;
 
@@ -130,6 +130,8 @@ bool SplitGene::check(auto& record)  /// record identified and ...?
     sequence_type &sq = record.sequence();
 bool SplitGene::check_rec(auto& record)
 {
+    /*
+    msa_seq_t &sq = record.sequence();
     count++;
     int flank = parent.flank;
     // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
@@ -158,7 +160,7 @@ bool SplitGene::check_rec(auto& record)
 
         auto bg = sq.begin()+beg;
         auto en = sq.begin()+end;
-        target = sequence_type{bg, en};
+        target = msa_seq_t{bg, en};
 
         grouped                  [target] = sg ;
         daily   [std::move(date)][target] = sg ;  // end of date
@@ -177,7 +179,7 @@ bool SplitGene::check_rec(auto& record)
 
     auto bg = sq.begin()+lbeg;
     auto en = sq.begin()+lend;
-    auto cur_seq = seqan3::dna5_vector{bg, en};
+    auto cur_seq = msa_seq_t{bg, en};
 
     SeqGr& sg1 = grouped[cur_seq];                // first try
     if (sg1.count++)                              // count not 0 ==> duplicate seq. More than 99% of cases.
@@ -242,7 +244,7 @@ bool SplitGene::check_rec(auto& record)
     grouped.erase(cur_seq);
     //seqan3::debug_stream << " New try ----- (" << lbeg << ", " << lend  <<")\n" ;
 
-    auto new_seq = sequence_type{sq.begin()+nlbeg, sq.begin()+nlend};
+    auto new_seq = msa_seq_t{sq.begin()+nlbeg, sq.begin()+nlend};
     SeqGr&   sgr = grouped[new_seq];
 
     if (sgr.count++)                                // duplicate seq. More than 99% of cases.
@@ -271,20 +273,20 @@ bool SplitGene::check_rec(auto& record)
 
     daily   [std::move(date)][          new_seq ] = sgr;            
     monthly[std::move(month)][std::move(new_seq)] = sgr;   
-    
-    return true;
+     */
+    return true;   
 }
 
-SeqGr SplitCoVfasta::SplitGene::set_seq_pos(const sequence_type& s)
+SeqGr SplitGene::set_seq_pos(const msa_seq_t& s)
 {
     // new, unknown seq. We need to find the right position of the target sequence
     // less than 1% of the seq. May be around 50k?
     SeqGr sg;
-    
+    /*
     auto output_config = seqan3::align_cfg::output_score{}          | 
-                            seqan3::align_cfg::output_begin_position{} |
-                            seqan3::align_cfg::output_end_position{}   | 
-                            seqan3::align_cfg::output_alignment{};
+                         seqan3::align_cfg::output_begin_position{} |
+                         seqan3::align_cfg::output_end_position{}   | 
+                         seqan3::align_cfg::output_alignment{};
     auto method = seqan3::align_cfg::method_local{};
     seqan3::align_cfg::scoring_scheme     scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score{1}, 
                                                     seqan3::mismatch_score{-1}}};
@@ -293,6 +295,7 @@ SeqGr SplitCoVfasta::SplitGene::set_seq_pos(const sequence_type& s)
     auto config = method | scheme | gap_costs | output_config;
 
     // try the fw primer
+    auto& forw = f_primers[forw_idx].seq;
     auto results = seqan3::align_pairwise(std::tie(s, forw), config);
     auto & res = *results.begin();
     //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
@@ -321,7 +324,7 @@ SeqGr SplitCoVfasta::SplitGene::set_seq_pos(const sequence_type& s)
             sg.beg = notfound;  // mark beg pos as not found !!
     }
     // we need to find rev primer location
-
+    auto& rev = r_primers[rev_idx].seq;
     auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
     auto & res_r = *res_rev.begin();
     //seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
@@ -345,12 +348,13 @@ SeqGr SplitCoVfasta::SplitGene::set_seq_pos(const sequence_type& s)
                                         "the reverse primer. Score: " + std::to_string(res.score() )};
     sg.end = notfound;  // mark both beg and end pos as not found !! Better try to align whole seq?? not sure..
     // todo  align with ref_seq
-
+*/
     return sg;
 }
 
 void SplitGene::write_grouped ()
 {
+    /*
     using types = seqan3::type_list<std::vector<seqan3::dna5>, std::string>;
     using fields = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
     using record_t = seqan3::sequence_record<types, fields>;
@@ -405,7 +409,7 @@ void SplitGene::write_grouped ()
                     + "_" + gr.id ;
             file_e_grm.push_back(record_t{std::move(seq), std::move(id)});
         }
-
+*/
 }
         
 // class SplitCoVfasta
@@ -414,7 +418,7 @@ void SplitCoVfasta::split_fasta( )
 {
     
     // Initialise a file input object with a FASTA file.
-    seqan3::sequence_file_input file_in{fasta};
+    seqan3::sequence_file_input<OLIGO> file_in{fasta};
 
     long t{0L}, m{(1L<<18)-1};
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
@@ -433,7 +437,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        //if (t>10000000) break;
+        if (t>10000000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
@@ -443,5 +447,26 @@ void SplitCoVfasta::split_fasta( )
                              << ". Grouped: "    << gene.grouped.size() << ". " ; 
         gene.write_grouped();
     }
+
+}
+
+/* https://docs.seqan.de/seqan3/main_user/cookbook.html 
+Reading records in chunks
+#include <seqan3/io/sequence_file/all.hpp>
+#include <seqan3/utility/views/chunk.hpp>
+ 
+int main()
+{
+    seqan3::sequence_file_input fin{std::filesystem::current_path() / "my.fastq"};
+ 
+    // `&&` is important because seqan3::views::chunk returns temporaries!
+    for (auto && records : fin | seqan3::views::chunk(10))
+    {
+        // `records` contains 10 elements (or less at the end)
+        seqan3::debug_stream << "Taking the next 10 sequences:\n";
+        seqan3::debug_stream << "ID:  " << (*records.begin()).id() << '\n'; // prints first ID in batch
+    }
+The example above will iterate over the file by reading 10 records at a time. If no 10 records are available anymore, it will just print the remaining records.
+*/
 
 }

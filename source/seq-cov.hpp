@@ -62,10 +62,19 @@ struct SeqGr
     std::string id;
 };
 
+using oligo_seq_alph = seqan3::dna15;
+using oligo_seq_t    = seqan3::dna15_vector;
+using msa_seq_alph   = seqan3::gapped<oligo_seq_alph>;
+using msa_seq_t      = std::vector<msa_seq_alph>;
+using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
+struct MSA : seqan3::sequence_file_input_default_traits_dna
 {
- public:    
-    using sequence_type = seqan3::dna5_vector;
-    using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"});
+    using sequence_alphabet = msa_seq_alph; // instead of dna5
+};
+struct OLIGO : seqan3::sequence_file_input_default_traits_dna
+{
+    using sequence_alphabet = oligo_seq_alph; // instead of dna5
+};
 
 struct oligo
 {
@@ -89,8 +98,8 @@ struct SplitGene
                         ignore{!(split || group)};
     
 
-        int           beg{0}, end{0}, match{0};
-    };
+    static constexpr int notfound = std::numeric_limits<int>::lowest(); 
+    
 
     int                 fw_match, rv_match;     // deprecate
     msa_seq_t           target;      
@@ -124,15 +133,11 @@ struct SplitGene
     void write_grouped ();
 };    
 
-        bool check_rec(auto& record);
 
-        SeqGr set_seq_pos(const sequence_type& s);
 class SplitCoVfasta
 {
  public:    
 
-        void write_grouped ();
-    };    
 
  public:
     std::filesystem::path fasta;
@@ -160,7 +165,7 @@ class SplitCoVfasta
     void add_gene(const std::filesystem::path& oligos, std::string gene, bool split, bool group, 
                      std::string fw="", std::string rv="")  // todo implement conditional split
     {
-        genes.emplace_back(*this, gene, split, group, oligos).read_oligos(oligos);
+        genes.emplace_back(*this, gene, split, group).read_oligos(oligos);
     }
 
     void split_fasta( );
