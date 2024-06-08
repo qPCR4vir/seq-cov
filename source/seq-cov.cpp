@@ -126,8 +126,23 @@ bool SplitGene::check(auto& record)  /// record identified and ...?
     return true;
 }
 
+bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
+                                                int& beg, int& end, std::vector<int>& msa_pos, int tent_len)
 {
-    sequence_type &sq = record.sequence();
+    seq.clear();
+    seq.reserve(tent_len);
+    msa_pos.clear();
+    msa_pos.reserve(tent_len);
+    // go through the sequence and eliminate gaps to reconstruct the original sequence
+    for (int i = beg; i < end; ++i)
+    {
+        if (s[i].is_alternative<seqan3::gap>() ) continue;
+        seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>());
+        msa_pos.push_back(i);
+    }
+    return true;
+}
+
 bool SplitGene::check_rec(auto& record)
 {
     /*
