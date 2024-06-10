@@ -117,33 +117,12 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
     return true;
 }
 
-bool SplitGene::check_rec(auto& record)
 void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
 {
-    seqan3::nucleotide_scoring_scheme mismatch; // hamming distance is default
-    using namespace seqan3::literals;
 
     for (auto & primer : f_primers)
     {
-        pattern_q &pq = tq.patterns.emplace_back(primer);
-        oligo_seq_t target;
-        reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
-        if (target.size() != primer.seq.size()) 
-        {
-            align(pq, sq); // todo: try to align the primer with the target sequence
-            continue;
-        }
-        pq.pattern = std::string(primer.seq.size(), '.');
-        int len = primer.seq.size();
-        for (int i = 0; i < len; ++i)
-        {
-            if (target[i] == 'N'_dna15) pq.N++;
-            if (!mismatch.score(primer.seq[i], target[i])) continue;
-            pq.pattern[i] = target[i].to_char();
-            pq.mm++;
-            if (len - i <= parent.crit_term_nt) pq.crit++;
-            pq.Q = pq.mm + pq.crit * 4;
-        }
+        evaluate_target_primer(tq, primer, sq);
     }
     for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
@@ -151,7 +130,30 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
                              << pq.pattern << '\n'
                              //<< target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
-    
+}
+
+void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq)
+{
+    pattern_q &pq = tq.patterns.emplace_back(primer);
+    oligo_seq_t target;
+    reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
+    if (target.size() != primer.seq.size())
+        return align(pq, sq); // todo: try to align the primer with the target sequence
+ 
+    pq.pattern = std::string(primer.seq.size(), '.');
+    int len = primer.seq.size();
+    for (int i = 0; i < len; ++i)
+    {
+        if (target[i] == 'N'_dna15)
+            pq.N++;
+        if (!mismatch.score(primer.seq[i], target[i]))
+            continue;
+        pq.pattern[i] = target[i].to_char();
+        pq.mm++;
+        if (len - i <= parent.crit_term_nt)
+            pq.crit++;
+        pq.Q = pq.mm + pq.crit * 4;
+    }
 }
 
 target_count& SplitGene::check_rec(auto& record)

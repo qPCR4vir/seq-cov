@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
+#include <seqan3/alignment/scoring/nucleotide_scoring_scheme.hpp> // for nucleotide_scoring_scheme
 #include <seqan3/alphabet/hash.hpp>
 #include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
 #include <seqan3/core/debug_stream.hpp>         // for debug_stream
@@ -54,6 +55,7 @@ struct hash<urng_t>
 
 namespace cov
 {
+using namespace seqan3::literals;
 
 using oligo_seq_alph = seqan3::dna15;
 using oligo_seq_t    = seqan3::dna15_vector;
@@ -124,6 +126,8 @@ struct parsed_id
 class SplitCoVfasta;
 struct SplitGene
 {
+    seqan3::nucleotide_scoring_scheme<int8_t> mismatch; // hamming distance is default
+
     SplitCoVfasta const &parent;
     const std::string   gene;
     int                 forw_idx{}, rev_idx{};    
@@ -152,10 +156,10 @@ struct SplitGene
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
-    void evaluate_target(target_q  & tq, msa_seq_t& target);
-
     bool reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
                             int& beg, int& end, std::vector<int>& msa_pos, int tent_len);
+    void evaluate_target(target_q &tq, msa_seq_t &target);
+    void evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq);
 
     void write_grouped ();
 };    
