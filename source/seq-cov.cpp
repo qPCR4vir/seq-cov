@@ -433,7 +433,7 @@ void SplitCoVfasta::split_fasta( )
 {
     
     // Initialise a file input object with a FASTA file.
-    seqan3::sequence_file_input<OLIGO> file_in{fasta};
+    seqan3::sequence_file_input<MSA> file_in{fasta};
 
     long t{0L}, m{(1L<<18)-1};
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 

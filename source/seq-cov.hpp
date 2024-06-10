@@ -70,10 +70,12 @@ using sequence_file_output = decltype(seqan3::sequence_file_output{"name.fasta"}
 struct MSA : seqan3::sequence_file_input_default_traits_dna
 {
     using sequence_alphabet = msa_seq_alph; // instead of dna5
+    using sequence_legal_alphabet = msa_seq_alph;
 };
 struct OLIGO : seqan3::sequence_file_input_default_traits_dna
 {
     using sequence_alphabet = oligo_seq_alph; // instead of dna5
+    
 };
 
 struct oligo
