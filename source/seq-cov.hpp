@@ -10,6 +10,7 @@
 #include <seqan3/alphabet/hash.hpp>
 #include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
 #include <seqan3/core/debug_stream.hpp>         // for debug_stream
+//#include <seqan3/alignment/decorator/gap_decorator.hpp>
 
 namespace std
 {
@@ -136,19 +137,8 @@ struct SplitGene
 
     bool read_oligos(const std::filesystem::path& oligos);
 
-    bool                split, 
-                        group,  // we are asked to split, group or ignore this?
-                        ignore{!(split || group)};
-    
-
-    static constexpr int notfound = std::numeric_limits<int>::lowest(); 
-    
-
-    int                 fw_match, rv_match;     // deprecate
-    msa_seq_t           target;      
     std::vector<int>    msa_target_pos;
-    int                 beg{0}, end{0}, len{0}, count{0}; 
-    const std::string   start{gene+"|"};
+    int                 beg{0}, end{0}, count{0}; 
 
     using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
     grouped_by_seq      grouped; 
@@ -157,20 +147,17 @@ struct SplitGene
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
-    bool reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
-                            int& beg, int& end, std::vector<int>& msa_pos, int tent_len);
     void evaluate_target(target_q &tq, msa_seq_t &target);
     void evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq);
 
+    bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,
+                         int &beg, int &end, std::vector<int> &msa_pos, int tent_len);
     void write_grouped ();
 };    
 
 
 class SplitCoVfasta
 {
- public:    
-
-
  public:
     std::filesystem::path fasta;
     std::filesystem::path dir       {fasta.parent_path()};

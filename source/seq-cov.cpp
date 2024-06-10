@@ -271,8 +271,6 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     // hCoV-19/USA/AK-PHL10443/2021|EPI_ISL_3232474|2021-07-13|NorthAmerica
     // hCoV-19/Ireland/D-NVRL-Z21IRL04853/2021|EPI_ISL_8349991|2021-12-13|Europe
 
-
-
     std::size_t EPI_ISL_beg = id.find('|') + 1;         
     std::size_t year_beg    = id.find('|', EPI_ISL_beg) + 1;          
     std::size_t month_beg   = year_beg + 5;
