@@ -144,12 +144,10 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
 }
 
 bool SplitGene::check_rec(auto& record)
+void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
 {
-    using namespace seqan3::literals;
-    msa_seq_t sq = record.sequence();
-    count++;
     seqan3::nucleotide_scoring_scheme mismatch; // hamming distance is default
-    target_q tq;
+    using namespace seqan3::literals;
 
     for (auto & primer : f_primers)
     {
@@ -173,7 +171,7 @@ bool SplitGene::check_rec(auto& record)
             pq.Q = pq.mm + pq.crit * 4;
         }
     }
-     for (auto & pq : tq.patterns)
+    for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
@@ -188,6 +186,12 @@ bool SplitGene::check_rec(auto& record)
     msa_seq_t& sq = record.sequence();
     count++;
     auto & target_c = grouped[{sq.begin()+beg-1, sq.begin()+end}];  // todo: check if it is new
+    if (!target_c.count)  // new target sequence
+        evaluate_target(target_c.target, sq);
+    
+    target_c.count++;
+
+
     /*
     int flank = parent.flank;
 

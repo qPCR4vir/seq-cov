@@ -164,6 +164,7 @@ struct SplitGene
     bool check(auto& record);
 
     bool check_rec(auto& record);
+    void evaluate_target(target_q  & tq, msa_seq_t& target);
 
     SeqGr set_seq_pos(const msa_seq_t& s);
 
