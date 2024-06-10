@@ -148,11 +148,7 @@ struct SplitGene
     using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
     grouped_by_seq      grouped; 
 
-    
-    SplitGene( SplitCoVfasta const &parent, 
-                            std::string gene, 
-                                bool split, 
-                                bool group);
+    SplitGene( SplitCoVfasta const &parent, std::string gene);
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
@@ -181,8 +177,7 @@ class SplitCoVfasta
                           crit_N{3},
                           crit_gap{2};  // todo how to check partial seqs?
     double                match;
-    bool                  check_date = !(from.empty() && to.empty()), 
-                          full_msa   = true;
+    bool                  check_date = !(from.empty() && to.empty());
     msa_seq_t             msa_ref;
     oligo_seq_t           ref_seq;      
     std::vector<int>      msa_pos;
@@ -192,18 +187,17 @@ class SplitCoVfasta
 
  public:
     SplitCoVfasta(const std::filesystem::path& fasta,
-                                       bool full_msa, 
                                            int flank, 
                                         double match, 
                                     std::string from, 
                                     std::string to)
-    : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}, full_msa{full_msa}
+    : fasta{fasta}, flank{flank}, match{match}, from{from}, to{to}
     {}
 
-    void add_gene(const std::filesystem::path& oligos, std::string gene, bool split, bool group, 
+    void add_gene(const std::filesystem::path& oligos, std::string gene, 
                      std::string fw="", std::string rv="")  // todo implement conditional split
     {
-        genes.emplace_back(*this, gene, split, group).read_oligos(oligos);
+        genes.emplace_back(*this, gene).read_oligos(oligos);
     }
 
     void split_fasta( );

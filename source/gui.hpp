@@ -17,8 +17,6 @@ class GeneGUI: public nana::panel<false>
     GeneGUI(nana::window parent, std::string gene_name="", std::string fw="", std::string rv="");
 
     nana::textbox  gene     {*this};  // todo use a combox 
-    nana::checkbox split    {*this, "split"},
-                   group    {*this, "group"};
     nana::textbox  forw     {*this};
     nana::textbox  rev      {*this};
     nana::button   set      {*this, "..."}; 
@@ -29,7 +27,6 @@ class GeneGUI: public nana::panel<false>
 class GUI: public nana::form
 {
     nana::label    input_file_label{*this, "Original fasta file:"};
-    nana::checkbox full_msa        {*this, "full MSA"};
     nana::textbox  input_file      {*this},
                    from            {*this}, // todo & use a date picker
                    to              {*this}; // todo & use a date picker

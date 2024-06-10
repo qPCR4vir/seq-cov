@@ -36,16 +36,14 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gene, bool split, bool group)
-        : parent{parent}, 
-          gene{gene}, 
-          split{split}, group{group}
+SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gene)
+        : parent{parent}, gene{gene}
 {
     
     //if (split) file_E.open( );  // todo implement conditional split
     std::cout << std::boolalpha  
         << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
-        << ", gene " << start << gene <<": " << split << " into "
+        << ", gene " << gene << " into "
         << (parent.dir / (gene + "." + parent.fasta_name)).string();
     
 }
