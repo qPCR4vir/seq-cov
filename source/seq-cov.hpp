@@ -150,6 +150,9 @@ class SplitCoVfasta
     double                match;
     bool                  check_date = !(from.empty() && to.empty()), 
                           full_msa   = true;
+    msa_seq_t             msa_ref;
+    oligo_seq_t           ref_seq;      
+    std::vector<int>      msa_pos;
 
  private:
     std::vector<SplitGene> genes;
@@ -171,6 +174,8 @@ class SplitCoVfasta
     }
 
     void split_fasta( );
+
+    void set_ref_pos();
 };
 
 } // namespace cov

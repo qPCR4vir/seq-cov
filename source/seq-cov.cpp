@@ -429,9 +429,33 @@ void SplitGene::write_grouped ()
         
 // class SplitCoVfasta
  
+void SplitCoVfasta::set_ref_pos( )
+{
+    // Initialise a file input object with a FASTA file.
+    seqan3::sequence_file_input<MSA> file_in{fasta};
+
+    auto ref_rec = *file_in.begin();
+    msa_ref = std::move(ref_rec.sequence());
+    int msa_len = msa_ref.size();
+    seqan3::debug_stream << "\nMSA Reference: " << ref_rec.id() << "\tlen = " << msa_len << '\n';
+    
+    ref_seq.reserve(32000);
+    msa_pos.clear();
+    msa_pos.reserve(ref_seq.capacity());
+    // go through the sequence and eliminate gaps to reconstruct the original sequence
+    for ( int i = 0; i < msa_len; ++i) 
+    {
+        if (msa_ref[i].holds_alternative<seqan3::gap>())  continue;
+        ref_seq.push_back(msa_ref[i].convert_unsafely_to<oligo_seq_alph>());
+        msa_pos.push_back(i);
+    }
+    for (auto & gene : genes) gene.set_ref_pos();
+
+}
+
 void SplitCoVfasta::split_fasta( )
 {
-    
+    set_ref_pos();
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
