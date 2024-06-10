@@ -107,8 +107,19 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
     seq.reserve(tent_len);
     msa_pos.clear();
     msa_pos.reserve(tent_len);
+    bool reverse = (beg > end);
     // go through the sequence and eliminate gaps to reconstruct the original sequence
-     for ( int i = parent.msa_pos[beg-1]; i < parent.msa_pos[end]; ++i)
+    if (reverse) 
+    {
+        for ( int i = parent.msa_pos[beg-1]; i >= parent.msa_pos[end-1]; --i)
+        {
+            if (s[i].holds_alternative<seqan3::gap>() ) continue;
+            seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>().complement());
+            msa_pos.push_back(i);
+        }
+        return true;
+    }
+    for ( int i = parent.msa_pos[beg-1]; i <= parent.msa_pos[end-1]; ++i)
     {
         if (s[i].holds_alternative<seqan3::gap>() ) continue;
         seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>());
@@ -123,6 +134,18 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
     for (auto & primer : f_primers)
     {
         evaluate_target_primer(tq, primer, sq);
+    }
+    for (auto & primer : r_primers)
+    {
+        evaluate_target_primer(tq, primer, sq);
+    }
+    for (auto & probe : probes_s)
+    {
+        evaluate_target_primer(tq, probe, sq);
+    }
+    for (auto & probe : probes_a)
+    {
+        evaluate_target_primer(tq, probe, sq);
     }
     for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
@@ -154,6 +177,12 @@ void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, co
             pq.crit++;
         pq.Q = pq.mm + pq.crit * 4;
     }
+    seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                             << pq.primer.seq <<'\n' 
+                             << pq.pattern << '\n'
+                             << target << '\n' 
+                             << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
+
 }
 
 target_count& SplitGene::check_rec(auto& record)
@@ -332,7 +361,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        if (t>10) break;
+        if (t>100) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
