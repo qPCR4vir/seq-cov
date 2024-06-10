@@ -180,6 +180,14 @@ bool SplitGene::check_rec(auto& record)
                              //<< target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
     
+}
+
+bool SplitGene::check_rec(auto& record)
+{
+    
+    msa_seq_t& sq = record.sequence();
+    count++;
+    auto & target_c = grouped[{sq.begin()+beg-1, sq.begin()+end}];  // todo: check if it is new
     /*
     int flank = parent.flank;
 

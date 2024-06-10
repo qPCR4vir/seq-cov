@@ -95,6 +95,32 @@ struct target_q
 {
     std::vector<pattern_q> patterns;
 };
+struct country_count
+{
+    std::string country;
+    int         count = 0;
+};
+struct day_count
+{
+    std::unordered_map<std::string, country_count> countries;
+    int         count = 0;
+};
+struct month_count
+{
+    std::unordered_map<int, day_count> days;
+    int         count = 0;
+};
+struct year_count
+{
+    std::unordered_map<int, month_count> months;
+    int count = 0;
+};
+struct target_count
+{
+    std::unordered_map<std::string, cov::year_count> years;
+    target_q target;
+    int count = 0;
+};
 struct parsed_id
 {
     std::string country, isolate;
@@ -125,13 +151,9 @@ struct SplitGene
     int                 beg{0}, end{0}, len{0}, count{0}; 
     const std::string   start{gene+"|"};
 
-    using grouped_by_seq = std::unordered_map<msa_seq_t, SeqGr>;
+    using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
+    grouped_by_seq      grouped; 
 
-    grouped_by_seq                                  grouped; 
-    std::unordered_map<std::string, grouped_by_seq> daily,  
-                                                    monthly;
-
-    //sequence_file_output file_fasta_split;   
     
     SplitGene( SplitCoVfasta const &parent, 
                             std::string gene, 
