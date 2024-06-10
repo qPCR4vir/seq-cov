@@ -280,7 +280,7 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     std::size_t region_beg  = day_beg + 3;
 
     pid.isolate = id.substr(0, EPI_ISL_beg -1);      
-    seqan3::debug_stream <<id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg) << '\n' ;            
+    // seqan3::debug_stream <<id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg) << '\n' ;            
     pid.EPI_ISL = std::stoi(id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg)); // 8
 
     pid.year  = std::stoi(id.substr(year_beg, 4));  // 4
@@ -289,9 +289,9 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 
     pid.country = id.substr(region_beg) + " - " + pid.isolate.substr(8, pid.isolate.find('/', 8) - 8) ;  
 
-    seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
+/*     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
                          << pid.year << " - " << pid.month << " - " << pid.day 
-                         << " - " << pid.country << '\n' ;
+                         << " - " << pid.country << '\n' ; */
 
 }
 
