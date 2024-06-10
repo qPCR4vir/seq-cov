@@ -102,30 +102,6 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         return true;
 }
 
-bool SplitGene::check(auto& record)  /// record identified and ...?
-{
-    // seqan3::debug_stream << '\n' << record.id();
-    if (ignore) return false;
-    if (!parent.full_msa)
-    {
-        if (!record.id().starts_with(start)) return false;
-
-        if (split) 
-        {/*if (!file_fasta_split) // todo deprecate
-            {
-                file_fasta_split = sequence_file_output{(parent.dir / (gene + "." + parent.fasta_name)
-                                            ).replace_extension("fasta")};   
-            }
-            file_fasta_split.push_back(record); 
-         */
-        }
-    }
-
-    if (group) check_rec(record);
-    
-    return true;
-}
-
 bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
                                                 int& beg, int& end, std::vector<int>& msa_pos, int tent_len)
 {
