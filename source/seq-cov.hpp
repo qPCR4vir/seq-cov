@@ -55,13 +55,6 @@ struct hash<urng_t>
 namespace cov
 {
 
-struct SeqGr
-{
-    int count{0};
-    int beg{0}, end{0};  // position of the actual target IN THIS grouped seq.
-    std::string id;
-};
-
 using oligo_seq_alph = seqan3::dna15;
 using oligo_seq_t    = seqan3::dna15_vector;
 using msa_seq_alph   = seqan3::gapped<oligo_seq_alph>;
@@ -165,8 +158,6 @@ struct SplitGene
 
     bool check_rec(auto& record);
     void evaluate_target(target_q  & tq, msa_seq_t& target);
-
-    SeqGr set_seq_pos(const msa_seq_t& s);
 
     bool reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
                             int& beg, int& end, std::vector<int>& msa_pos, int tent_len);
