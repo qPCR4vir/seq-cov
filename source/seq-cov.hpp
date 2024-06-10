@@ -155,7 +155,7 @@ struct SplitGene
                                 bool group);
     
     /// record identified and ...?
-    bool check_rec(auto& record);
+    target_count& check_rec(auto& record);
     void evaluate_target(target_q  & tq, msa_seq_t& target);
 
     bool reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 

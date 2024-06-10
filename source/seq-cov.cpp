@@ -156,19 +156,19 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
     
 }
 
-bool SplitGene::check_rec(auto& record)
+target_count& SplitGene::check_rec(auto& record)
 {
     
     msa_seq_t& sq = record.sequence();
     count++;
-    auto & target_c = grouped[{sq.begin()+beg-1, sq.begin()+end}];  // todo: check if it is new
+    target_count & target_c = grouped[{sq.begin()+beg-1, sq.begin()+end}];  // todo: check if it is new
     if (!target_c.count)  // new target sequence
         evaluate_target(target_c.target, sq);
     
     target_c.count++;
 
 
-    return true;   
+    return target_c;   
 }
 
 void SplitGene::write_grouped ()
@@ -313,8 +313,9 @@ void SplitCoVfasta::split_fasta( )
         parse_id(record.id(), pid);
 
         for (auto & gene : genes)             // for each sequence, check each gene/target
-            if (gene.check(record)) 
-                break;
+        {
+            target_count &tc = gene.check_rec(record);
+        }
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
             seqan3::debug_stream << '.' ;
