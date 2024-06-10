@@ -134,9 +134,9 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
     msa_pos.clear();
     msa_pos.reserve(tent_len);
     // go through the sequence and eliminate gaps to reconstruct the original sequence
-    for (int i = beg; i < end; ++i)
+     for ( int i = parent.msa_pos[beg-1]; i < parent.msa_pos[end]; ++i)
     {
-        if (s[i].is_alternative<seqan3::gap>() ) continue;
+        if (s[i].holds_alternative<seqan3::gap>() ) continue;
         seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>());
         msa_pos.push_back(i);
     }
@@ -145,9 +145,26 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
 
 bool SplitGene::check_rec(auto& record)
 {
-    /*
-    msa_seq_t &sq = record.sequence();
+    msa_seq_t sq = record.sequence();
     count++;
+    seqan3::nucleotide_scoring_scheme mismatch; // hamming distance is default
+
+    for (auto & primer : f_primers)
+    {
+        oligo_seq_t target;
+        reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
+        std::string pattern(primer.seq.size(), '.');
+        for (int i = 0; i < primer.seq.size(); ++i)
+        {
+            if (mismatch.score(primer.seq[i], target[i])) 
+                pattern[i] = target[i].to_char();
+        }
+        seqan3::debug_stream << "\nPrimer: " << primer.name << ":\n" 
+                             << primer.seq <<'\n' 
+                             << pattern << '\n'
+                             << target << '\n' ;
+    }
+    /*
     int flank = parent.flank;
     // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
     //           1            212345678910
@@ -434,14 +451,14 @@ void SplitCoVfasta::set_ref_pos( )
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
-    auto ref_rec = *file_in.begin();
+    auto&& ref_rec = *file_in.begin();
     msa_ref = std::move(ref_rec.sequence());
     int msa_len = msa_ref.size();
-    seqan3::debug_stream << "\nMSA Reference: " << ref_rec.id() << "\tlen = " << msa_len << '\n';
-    
+
     ref_seq.reserve(32000);
     msa_pos.clear();
     msa_pos.reserve(ref_seq.capacity());
+
     // go through the sequence and eliminate gaps to reconstruct the original sequence
     for ( int i = 0; i < msa_len; ++i) 
     {
@@ -449,20 +466,25 @@ void SplitCoVfasta::set_ref_pos( )
         ref_seq.push_back(msa_ref[i].convert_unsafely_to<oligo_seq_alph>());
         msa_pos.push_back(i);
     }
-    for (auto & gene : genes) gene.set_ref_pos();
+
+    seqan3::debug_stream << "\n\nMSA Reference: " << ref_rec.id() << ",\t MSA lenth = " << msa_len << ", reference lenth = " << ref_seq.size() << '\n';
+    
+    // for (auto & gene : genes) gene.set_ref_pos(); \todo: check correct positions of primers on the reference sequence
 
 }
 
 void SplitCoVfasta::split_fasta( )
 {
     set_ref_pos();
+
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
     long t{0L}, m{(1L<<18)-1};
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
-    for (auto & record : file_in)             // read each sequence in the file
+
+    for (auto && record : file_in)             // read each sequence in the file
     {
         for (auto & gene : genes)             // for each sequence, check each gene/target
             if (gene.check(record)) 
@@ -476,7 +498,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        if (t>10000000) break;
+        if (t>10) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
