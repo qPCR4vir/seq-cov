@@ -85,6 +85,17 @@ struct oligo
     int           beg{0}, end{0}, match{0};
 };
 
+struct pattern_q
+{
+    oligo&      primer;
+    std::string pattern;
+    int         Q{0}, mm{0}, N{0}, gap{0}, crit{0};
+};
+struct target_q
+{
+    std::vector<pattern_q> patterns;
+};
+
 class SplitCoVfasta;
 struct SplitGene
 {
@@ -146,7 +157,11 @@ class SplitCoVfasta
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()},
                           from, to;
-    int                   flank;
+    int                   flank{5},
+                          crit_term_nt{4},
+                          crit_mm{3},
+                          crit_N{3},
+                          crit_gap{2};  // todo how to check partial seqs?
     double                match;
     bool                  check_date = !(from.empty() && to.empty()), 
                           full_msa   = true;

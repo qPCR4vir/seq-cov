@@ -145,25 +145,41 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
 
 bool SplitGene::check_rec(auto& record)
 {
+    using namespace seqan3::literals;
     msa_seq_t sq = record.sequence();
     count++;
     seqan3::nucleotide_scoring_scheme mismatch; // hamming distance is default
+    target_q tq;
 
     for (auto & primer : f_primers)
     {
+        pattern_q &pq = tq.patterns.emplace_back(primer);
         oligo_seq_t target;
         reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
-        std::string pattern(primer.seq.size(), '.');
-        for (int i = 0; i < primer.seq.size(); ++i)
+        if (target.size() != primer.seq.size()) 
         {
-            if (mismatch.score(primer.seq[i], target[i])) 
-                pattern[i] = target[i].to_char();
+            align(pq, sq); // todo: try to align the primer with the target sequence
+            continue;
         }
-        seqan3::debug_stream << "\nPrimer: " << primer.name << ":\n" 
-                             << primer.seq <<'\n' 
-                             << pattern << '\n'
-                             << target << '\n' ;
+        pq.pattern = std::string(primer.seq.size(), '.');
+        int len = primer.seq.size();
+        for (int i = 0; i < len; ++i)
+        {
+            if (target[i] == 'N'_dna15) pq.N++;
+            if (!mismatch.score(primer.seq[i], target[i])) continue;
+            pq.pattern[i] = target[i].to_char();
+            pq.mm++;
+            if (len - i <= parent.crit_term_nt) pq.crit++;
+            pq.Q = pq.mm + pq.crit * 4;
+        }
     }
+     for (auto & pq : tq.patterns)
+        seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                             << pq.primer.seq <<'\n' 
+                             << pq.pattern << '\n'
+                             //<< target << '\n' 
+                             << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
+    
     /*
     int flank = parent.flank;
     // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
