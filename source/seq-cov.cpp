@@ -315,6 +315,15 @@ void SplitCoVfasta::split_fasta( )
         for (auto & gene : genes)             // for each sequence, check each gene/target
         {
             target_count &tc = gene.check_rec(record);
+            year_count &yc = tc.years[pid.year];
+            yc.count++;
+            month_count &mc = yc.months[pid.month];
+            mc.count++;
+            day_count &dc = mc.days[pid.day];
+            dc.count++;
+            country_count &cc = dc.countries[pid.country];
+            if (!cc.count) cc.id = std::move(pid);
+            cc.count++;
         }
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication

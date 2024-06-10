@@ -90,9 +90,16 @@ struct target_q
 {
     std::vector<pattern_q> patterns;
 };
+struct parsed_id
+{
+    std::string country, isolate;
+    int         year, month, day;
+    long        EPI_ISL;
+};
+
 struct country_count
 {
-    std::string country;
+    parsed_id   id;
     int         count = 0;
 };
 struct day_count
@@ -112,15 +119,9 @@ struct year_count
 };
 struct target_count
 {
-    std::unordered_map<std::string, cov::year_count> years;
+    std::unordered_map<int, cov::year_count> years;
     target_q target;
     int count = 0;
-};
-struct parsed_id
-{
-    std::string country, isolate;
-    int         year, month, day;
-    long        EPI_ISL;
 };
 
 class SplitCoVfasta;
