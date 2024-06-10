@@ -117,7 +117,8 @@ struct target_count
 struct parsed_id
 {
     std::string country, isolate;
-    int         year, month, day, EPI_ISL;
+    int         year, month, day;
+    long        EPI_ISL;
 };
 
 class SplitCoVfasta;
