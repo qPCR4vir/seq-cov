@@ -182,13 +182,7 @@ bool SplitGene::check_rec(auto& record)
     
     /*
     int flank = parent.flank;
-    // >Gene name|Isolate name|YYYY-MM-DD|Isolate ID|Passage details/history|Type^^
-    //           1            212345678910
-    std::string id = std::move(record.id());  // each record is checked only once
 
-    std::size_t date_beg = id.find('|', 1 + id.find('|')) + 1;           // pos next to 2nd |
-    std::string date     = id.substr(date_beg, id.find('|', date_beg) - date_beg);  // 9 or 10
-    std::string month    = id.substr(date_beg,  7);
 
     if (!len)
     {   
@@ -489,6 +483,41 @@ void SplitCoVfasta::set_ref_pos( )
 
 }
 
+void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
+{
+    std::stringstream ss{id};
+    // >hCoV-19/Wuhan/WIV04/2019|EPI_ISL_402124|2019-12-30|China
+    // >hCoV-19/Sweden/6332562676/2022|EPI_ISL_16076002|2022-11-28|Europe
+    // hCoV-19/Wales/PHWC-PRWWBD/2021|EPI_ISL_6145484|2021-10-19|Europe
+    // hCoV-19/Indonesia/JK-GSILab-624880/2021|EPI_ISL_3230236|2021-07-25|Asia
+    // hCoV-19/Indonesia/JK-GSILab-622248/2021|EPI_ISL_3230241|2021-07-16|Asia
+    // hCoV-19/USA/AK-PHL10443/2021|EPI_ISL_3232474|2021-07-13|NorthAmerica
+    // hCoV-19/Ireland/D-NVRL-Z21IRL04853/2021|EPI_ISL_8349991|2021-12-13|Europe
+
+
+
+    std::size_t EPI_ISL_beg = id.find('|') + 1;         
+    std::size_t year_beg    = id.find('|', EPI_ISL_beg) + 1;          
+    std::size_t month_beg   = year_beg + 5;
+    std::size_t day_beg     = month_beg + 3;  
+    std::size_t region_beg  = day_beg + 3;
+
+    pid.isolate = id.substr(0, EPI_ISL_beg -1);      
+    seqan3::debug_stream <<id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg) << '\n' ;            
+    pid.EPI_ISL = std::stoi(id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg)); // 8
+
+    pid.year  = std::stoi(id.substr(year_beg, 4));  // 4
+    pid.month = std::stoi(id.substr(month_beg, 2)); // 2
+    pid.day   = std::stoi(id.substr(day_beg, 2));   // 2
+
+    pid.country = id.substr(region_beg) + " - " + pid.isolate.substr(8, pid.isolate.find('/', 8) - 8) ;  
+
+    seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
+                         << pid.year << " - " << pid.month << " - " << pid.day 
+                         << " - " << pid.country << '\n' ;
+
+}
+
 void SplitCoVfasta::split_fasta( )
 {
     set_ref_pos();
@@ -502,6 +531,10 @@ void SplitCoVfasta::split_fasta( )
 
     for (auto && record : file_in)             // read each sequence in the file
     {
+        seqan3::debug_stream << "\n" << record.id() << '\n' ;
+        parsed_id pid;
+        parse_id(record.id(), pid);
+
         for (auto & gene : genes)             // for each sequence, check each gene/target
             if (gene.check(record)) 
                 break;

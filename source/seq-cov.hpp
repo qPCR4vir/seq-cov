@@ -95,6 +95,11 @@ struct target_q
 {
     std::vector<pattern_q> patterns;
 };
+struct parsed_id
+{
+    std::string country, isolate;
+    int         year, month, day, EPI_ISL;
+};
 
 class SplitCoVfasta;
 struct SplitGene
@@ -189,8 +194,8 @@ class SplitCoVfasta
     }
 
     void split_fasta( );
-
     void set_ref_pos();
+    void parse_id(const std::string& id, parsed_id& pid);
 };
 
 } // namespace cov
