@@ -309,7 +309,7 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     std::size_t EPI_ISL_beg = isolate_end + 7 + 9 ;               // id.find('|', isolate_end+5) + 1;         
     std::size_t EPI_ISL_end = id.find('|', EPI_ISL_beg+1) - 1;
     std::size_t EPI_ISL_len = EPI_ISL_end - EPI_ISL_beg   + 1;
-    std::size_t year_beg    = EPI_ISL_end                + 2 ;    //id.find('|', EPI_ISL_end) + 1;          
+    std::size_t year_beg    = EPI_ISL_end                 + 2;    //id.find('|', EPI_ISL_end) + 1;          
     std::size_t month_beg   = year_beg  + 5;
     std::size_t day_beg     = month_beg + 3;  
     std::size_t region_beg  = day_beg   + 3;
@@ -323,9 +323,9 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     auto m = s + month_beg;
     auto d = s + day_beg  ;    
     
-    std::from_chars(y, y + 5, pid.year );   
-    std::from_chars(d, d + 3, pid.month); 
-    std::from_chars(m, m + 3, pid.day  );
+    std::from_chars(y, m    , pid.year );   
+    std::from_chars(m, d    , pid.month); 
+    std::from_chars(d, d + 3, pid.day );
 
 /*     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
                          << pid.year << " - " << pid.month << " - " << pid.day 
