@@ -168,10 +168,8 @@ void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, co
     int len = primer.seq.size();
     for (int i = 0; i < len; ++i)
     {
-        if (target[i] == 'N'_dna15)
-            pq.N++;
-        if (!mismatch.score(primer.seq[i], target[i]))
-            continue;
+        if      (target[i] == 'N'_dna15)                      pq.N++;
+        else if (!mismatch.score(primer.seq[i], target[i]))   continue;
         pq.pattern[i] = target[i].to_char();
         pq.mm++;
         if (len - i <= parent.crit_term_nt)
