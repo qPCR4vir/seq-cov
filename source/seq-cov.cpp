@@ -203,62 +203,44 @@ target_count& SplitGene::check_rec(auto& record)
 
 void SplitGene::write_grouped ()
 {
-    /*
-    using types = seqan3::type_list<std::vector<seqan3::dna5>, std::string>;
-    using fields = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
+    using types    = seqan3::type_list<msa_seq_t, std::string>;
+    using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
     using record_t = seqan3::sequence_record<types, fields>;
-    using sgr_t = decltype(grouped)::value_type;
-    using sgr_p = sgr_t*;
+    using sgr_t    = decltype(grouped)::value_type;
+    using sgr_p    = sgr_t*;
 
-    if (!group) return;  // todo ?????
+    // std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
+       std::filesystem::path grd= parent.dir / (gene + ".daily-"   + parent.fasta_name);
+    // std::filesystem::path grm= parent.dir / (gene + ".monthly-" + parent.fasta_name);
 
-    std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
-    std::filesystem::path grd= parent.dir / (gene + ".daily-"   + parent.fasta_name);
-    std::filesystem::path grm= parent.dir / (gene + ".monthly-" + parent.fasta_name);
-
-    seqan3::debug_stream << "Going to write: " << gr.string() << "\n" ;
-    seqan3::sequence_file_output file_e_gr {gr },
-                                    file_e_grd{grd},
-                                    file_e_grm{grm};
+    seqan3::debug_stream << "Going to write: " << grd.string() << "\n" ;
+    seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >  file_e_grd{grd};  // , file_e_gr {gr },  file_e_grm{grm};
     
     std::vector<sgr_p> gr_v;
     gr_v.reserve(grouped.size());
-    for (sgr_t& sgr : grouped) gr_v.push_back(&sgr);
+    for (sgr_t& sgr : grouped) gr_v.push_back(&sgr);  // vector of pointers to grouped target_count sequences
 
-    std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)
-    {return a->second.count > b->second.count;});
+    std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)    {return a->second.count > b->second.count;});
 
-    for(sgr_p sg:gr_v)
+    for (sgr_p           sg :  gr_v            )   // pointers to grouped target_count   seq: target_count
+    for (auto& [year,    yc]:  sg->second.years)
+    for (auto& [month,   mc]:  yc.months   )  
+    for (auto& [day,     dc]:  mc.days     )
+    for (auto& [country, cc]:  dc.countries)
     {
-        auto id = "x_" + std::to_string(sg->second.count) 
-                    + "_" + std::to_string(sg->second.beg) 
-                    + "_" + std::to_string(sg->second.end)
-                    + "_" + sg->second.id ;
-        file_e_gr.push_back(record_t{std::move(sg->first), std::move(id)});
+        // easy to parse id with YYYY-MM-DD count, country,  EPI_ISL,  isolate
+        auto id = std::format("d_{:04d}-{:02d}-{:02d}_x_{}_c_{}_EPI_{}_i_{}", 
+                             year, month, day, cc.count, country, cc.id.EPI_ISL, cc.id.isolate);
+
+        // add target_q data : from patterns _p_ primer name, seq, Q, mm, N, crit, pattern
+        for (auto& pq : sg->second.target.patterns)
+        {
+            id += std::format("_p_{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
+                              pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
+        }
+            
+        file_e_grd.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
     }
-
-    for(auto& [date, group]: daily)
-        for(auto &[seq, gr] : group)
-        {
-            auto id = "d_" + date + 
-                    +"_x_"+ std::to_string(gr.count) 
-                    + "_" + std::to_string(gr.beg) 
-                    + "_" + std::to_string(gr.end)
-                    + "_" + gr.id ;
-            file_e_grd.push_back(record_t{std::move(seq), std::move(id)});
-        }
-
-    for(auto& [date, group]: monthly)
-        for(auto &[seq, gr] : group)
-        {
-            auto id = "m_" + date + 
-                    +"-15_x_"+ std::to_string(gr.count) 
-                    + "_" + std::to_string(gr.beg) 
-                    + "_" + std::to_string(gr.end)
-                    + "_" + gr.id ;
-            file_e_grm.push_back(record_t{std::move(seq), std::move(id)});
-        }
-*/
 }
 
 // class SplitCoVfasta
