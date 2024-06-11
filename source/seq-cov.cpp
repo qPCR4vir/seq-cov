@@ -1,4 +1,5 @@
 #include <string>
+#include <charconv>
 #include <iostream>
 #include <vector>
 #include <filesystem>
@@ -299,22 +300,32 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     // hCoV-19/Indonesia/JK-GSILab-622248/2021|EPI_ISL_3230241|2021-07-16|Asia
     // hCoV-19/USA/AK-PHL10443/2021|EPI_ISL_3232474|2021-07-13|NorthAmerica
     // hCoV-19/Ireland/D-NVRL-Z21IRL04853/2021|EPI_ISL_8349991|2021-12-13|Europe
-
-    std::size_t EPI_ISL_beg = id.find('|') + 1;         
-    std::size_t year_beg    = id.find('|', EPI_ISL_beg) + 1;          
-    std::size_t month_beg   = year_beg + 5;
+    std::size_t country_beg = 8;
+    std::size_t country_end = id.find('/',             8) - 1;          
+    std::size_t country_len = country_end - country_beg   + 1;
+    std::size_t isolate_beg = country_end                 + 2;
+    std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
+    std::size_t isolate_len = isolate_end - isolate_beg   + 1;
+    std::size_t EPI_ISL_beg = isolate_end + 7 + 9 ;               // id.find('|', isolate_end+5) + 1;         
+    std::size_t EPI_ISL_end = id.find('|', EPI_ISL_beg+1) - 1;
+    std::size_t EPI_ISL_len = EPI_ISL_end - EPI_ISL_beg   + 1;
+    std::size_t year_beg    = EPI_ISL_end                + 2 ;    //id.find('|', EPI_ISL_end) + 1;          
+    std::size_t month_beg   = year_beg  + 5;
     std::size_t day_beg     = month_beg + 3;  
-    std::size_t region_beg  = day_beg + 3;
+    std::size_t region_beg  = day_beg   + 3;
 
-    pid.isolate = id.substr(0, EPI_ISL_beg -1);      
-    // seqan3::debug_stream <<id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg) << '\n' ;            
-    pid.EPI_ISL = std::stoi(id.substr(EPI_ISL_beg+8, year_beg-1-8 - EPI_ISL_beg)); // 8
+    pid.isolate = id.substr(isolate_beg, isolate_len);                 
+    pid.EPI_ISL = id.substr(EPI_ISL_beg, EPI_ISL_len); 
+    pid.country = id.substr(region_beg) + " - " + id.substr(country_beg, country_len) ;  
 
-    pid.year  = std::stoi(id.substr(year_beg, 4));  // 4
-    pid.month = std::stoi(id.substr(month_beg, 2)); // 2
-    pid.day   = std::stoi(id.substr(day_beg, 2));   // 2
-
-    pid.country = id.substr(region_beg) + " - " + pid.isolate.substr(8, pid.isolate.find('/', 8) - 8) ;  
+    auto s = id.data() ;
+    auto y = s + year_beg ;
+    auto m = s + month_beg;
+    auto d = s + day_beg  ;    
+    
+    std::from_chars(y, y + 5, pid.year );   
+    std::from_chars(d, d + 3, pid.month); 
+    std::from_chars(m, m + 3, pid.day  );
 
 /*     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
                          << pid.year << " - " << pid.month << " - " << pid.day 

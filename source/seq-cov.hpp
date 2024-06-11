@@ -93,9 +93,8 @@ struct target_q
 };
 struct parsed_id
 {
-    std::string country, isolate;
+    std::string country, isolate, EPI_ISL;
     int         year, month, day;
-    long        EPI_ISL;
 };
 
 struct country_count
