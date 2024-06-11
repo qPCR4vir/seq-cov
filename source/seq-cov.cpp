@@ -148,13 +148,13 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
     {
         evaluate_target_primer(tq, probe, sq);
     }
-    for (auto & pq : tq.patterns)
+    /* for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
                              //<< target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
-}
+ */}
 
 void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq)
 {
@@ -178,12 +178,12 @@ void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, co
             pq.crit++;
         pq.Q = pq.mm + pq.crit * 4;
     }
-    seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+/*     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
                              << target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
-
+ */
 }
 
 target_count& SplitGene::check_rec(auto& record)
@@ -328,7 +328,7 @@ void SplitCoVfasta::split_fasta( )
 
     for (auto && record : file_in)             // read each sequence in the file
     {
-        seqan3::debug_stream << "\n" << record.id() << '\n' ;
+        // seqan3::debug_stream << "\n" << record.id() << '\n' ;
         parsed_id pid;
         parse_id(record.id(), pid);
 
@@ -347,14 +347,15 @@ void SplitCoVfasta::split_fasta( )
         }
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
-            seqan3::debug_stream << '.' ;
         {
+            // seqan3::debug_stream << '.' ;
+        
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
             for (auto & gene : genes)
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        if (t>100) break;
+        if (t>100000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
