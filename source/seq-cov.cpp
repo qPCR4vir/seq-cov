@@ -129,6 +129,15 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq,
     return true;
 }
 
+void SplitGene::align(pattern_q & pq, msa_seq_t& target)
+{
+    static long count{0L};
+    count++;
+    seqan3::debug_stream << "\n " << count << ": To do - align Primer: " << pq.primer.name << " \n" ;
+                        //<< target <<'\n' ;
+                        //<< pattern << '\n'  << target << '\n' ;  // << "Misatches: " << mm << ", Ns: " << N << ", crit: " << crit << '\n';
+}
+
 void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
 {
 
@@ -172,10 +181,9 @@ void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, co
         else if (!mismatch.score(primer.seq[i], target[i]))   continue;
         pq.pattern[i] = target[i].to_char();
         pq.mm++;
-        if (len - i <= parent.crit_term_nt)
-            pq.crit++;
-        pq.Q = pq.mm + pq.crit * 4;
-    }
+        if (len - i <= parent.crit_term_nt)                   pq.crit++;
+     }
+    pq.Q = pq.mm + pq.crit * 4;
 /*     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
@@ -353,7 +361,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        if (t>100000) break;
+        //if (t>1000000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 

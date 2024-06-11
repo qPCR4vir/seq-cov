@@ -148,6 +148,7 @@ struct SplitGene
     target_count& check_rec(auto& record);
     void evaluate_target(target_q &tq, msa_seq_t &target);
     void evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq);
+    void align(pattern_q &pq, msa_seq_t &target);
 
     bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,
                          int &beg, int &end, std::vector<int> &msa_pos, int tent_len);
