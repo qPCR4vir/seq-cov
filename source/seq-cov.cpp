@@ -280,24 +280,25 @@ void SplitCoVfasta::set_ref_pos( )
 
 void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 {
-    std::stringstream ss{id};
     // >hCoV-19/Wuhan/WIV04/2019|EPI_ISL_402124|2019-12-30|China
+    // d_2019-12-30_x_1_c_China - Wuhan_EPI_02124_i_WIV04_p_E_Sarbeco_F2_Q_0_mm_0_N_0_crit_0_pat_......................
     // >hCoV-19/Sweden/6332562676/2022|EPI_ISL_16076002|2022-11-28|Europe
     // hCoV-19/Wales/PHWC-PRWWBD/2021|EPI_ISL_6145484|2021-10-19|Europe
     // hCoV-19/Indonesia/JK-GSILab-624880/2021|EPI_ISL_3230236|2021-07-25|Asia
     // hCoV-19/Indonesia/JK-GSILab-622248/2021|EPI_ISL_3230241|2021-07-16|Asia
     // hCoV-19/USA/AK-PHL10443/2021|EPI_ISL_3232474|2021-07-13|NorthAmerica
     // hCoV-19/Ireland/D-NVRL-Z21IRL04853/2021|EPI_ISL_8349991|2021-12-13|Europe
+
     std::size_t country_beg = 8;
     std::size_t country_end = id.find('/',             8) - 1;          
     std::size_t country_len = country_end - country_beg   + 1;
     std::size_t isolate_beg = country_end                 + 2;
     std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
     std::size_t isolate_len = isolate_end - isolate_beg   + 1;
-    std::size_t EPI_ISL_beg = isolate_end + 7 + 9 ;               // id.find('|', isolate_end+5) + 1;         
+    std::size_t EPI_ISL_beg = isolate_end+1 + 6 + 8 ;               
     std::size_t EPI_ISL_end = id.find('|', EPI_ISL_beg+1) - 1;
     std::size_t EPI_ISL_len = EPI_ISL_end - EPI_ISL_beg   + 1;
-    std::size_t year_beg    = EPI_ISL_end                 + 2;    //id.find('|', EPI_ISL_end) + 1;          
+    std::size_t year_beg    = EPI_ISL_end                 + 2;   
     std::size_t month_beg   = year_beg  + 5;
     std::size_t day_beg     = month_beg + 3;  
     std::size_t region_beg  = day_beg   + 3;
@@ -313,7 +314,7 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     
     std::from_chars(y, m    , pid.year );   
     std::from_chars(m, d    , pid.month); 
-    std::from_chars(d, d + 3, pid.day );
+    std::from_chars(d, d + 3, pid.day  );
 
 /*     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
                          << pid.year << " - " << pid.month << " - " << pid.day 
