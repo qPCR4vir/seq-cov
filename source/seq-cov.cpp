@@ -215,12 +215,14 @@ void SplitGene::write_grouped ()
     using sgr_t    = decltype(grouped)::value_type;
     using sgr_p    = sgr_t*;
 
-    // std::filesystem::path gr = parent.dir / (gene + ".grouped-" + parent.fasta_name);
-       std::filesystem::path grd= parent.dir / (gene + ".daily-"   + parent.fasta_name);
-    // std::filesystem::path grm= parent.dir / (gene + ".monthly-" + parent.fasta_name);
+    // std::filesystem::path gr  = parent.dir / (gene + ".grouped-" + parent.fasta_name);
+       std::filesystem::path grdc= parent.dir / (gene + ".daily-coountry-"   + parent.fasta_name);
+       std::filesystem::path grd = parent.dir / (gene + ".daily-"            + parent.fasta_name);
+    // std::filesystem::path grm = parent.dir / (gene + ".monthly-" + parent.fasta_name);
 
     seqan3::debug_stream << "Going to write: " << grd.string() << "\n" ;
-    seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >  file_e_grd{grd};  // , file_e_gr {gr },  file_e_grm{grm};
+    seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >  file_e_grdc{grdc};  // , file_e_gr {gr },  file_e_grm{grm};
+    seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >  file_e_grd {grd };  // , file_e_gr {gr },  file_e_grm{grm};
     
     std::vector<sgr_p> gr_v;
     gr_v.reserve(grouped.size());
@@ -232,8 +234,6 @@ void SplitGene::write_grouped ()
     for (auto& [year,    yc]:  sg->second.years)
     for (auto& [month,   mc]:  yc.months   )  
     for (auto& [day,     dc]:  mc.days     )
-    for (auto& [country, cc]:  dc.countries)
-    {
     {    
         
         for (auto& [country, cc]:  dc.countries)
@@ -246,12 +246,19 @@ void SplitGene::write_grouped ()
                 id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
                                 pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
             }
+                
+            file_e_grdc.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
+        }
 
-        // add target_q data : from patterns _p_ primer name, seq, Q, mm, N, crit, pattern
+        auto& [country, cc] =  *dc.countries.begin();
+        auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}",
+                    cc.id.EPI_ISL, year, month, day, dc.count, country, cc.id.isolate);
+
+
         for (auto& pq : sg->second.target.patterns)
         {
-            id += std::format("_p_{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
-                              pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
+            id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
+                            pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
         }
             
         file_e_grd.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
