@@ -234,9 +234,18 @@ void SplitGene::write_grouped ()
     for (auto& [day,     dc]:  mc.days     )
     for (auto& [country, cc]:  dc.countries)
     {
-        // easy to parse id with YYYY-MM-DD count, country,  EPI_ISL,  isolate
-        auto id = std::format("d_{:04d}-{:02d}-{:02d}_x_{}_c_{}_EPI_{}_i_{}", 
-                             year, month, day, cc.count, country, cc.id.EPI_ISL, cc.id.isolate);
+    {    
+        
+        for (auto& [country, cc]:  dc.countries)
+        {
+            auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}", 
+                          cc.id.EPI_ISL, year, month, day, cc.count, country, cc.id.isolate);
+
+            for (auto& pq : sg->second.target.patterns)
+            {
+                id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
+                                pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
+            }
 
         // add target_q data : from patterns _p_ primer name, seq, Q, mm, N, crit, pattern
         for (auto& pq : sg->second.target.patterns)
