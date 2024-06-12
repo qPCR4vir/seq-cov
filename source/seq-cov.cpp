@@ -197,13 +197,15 @@ target_count& SplitGene::check_rec(auto& record)
     
     msa_seq_t& sq = record.sequence();
     count++;
-    target_count & target_c = grouped[{sq.begin()+beg-1, sq.begin()+end}];  // todo: check if it is new
+    long msa_beg{0}, msa_end{0};
+    if ( beg < end) { msa_beg = parent.msa_pos[beg-1]; msa_end = parent.msa_pos[end-1]; }
+    else            { msa_beg = parent.msa_pos[end-1]; msa_end = parent.msa_pos[beg-1]; }
+
+    target_count & target_c = grouped[{sq.begin()+msa_beg, sq.begin()+msa_end}];  // todo: check if it is new
     if (!target_c.count)  // new target sequence
         evaluate_target(target_c.target, sq);
     
     target_c.count++;
-
-
     return target_c;   
 }
 
@@ -378,7 +380,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        //if (t>1000000) break;
+        //if (t>10) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
