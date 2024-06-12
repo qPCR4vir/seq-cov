@@ -349,7 +349,7 @@ void SplitCoVfasta::split_fasta( )
             day_count &dc = mc.days[pid.day];
             dc.count++;
             country_count &cc = dc.countries[pid.country];
-            if (!cc.count) cc.id = std::move(pid);
+            if (!cc.count) cc.id = pid;
             cc.count++;
         }
 
