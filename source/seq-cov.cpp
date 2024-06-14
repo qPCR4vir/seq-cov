@@ -272,7 +272,7 @@ void SplitGene::write_grouped ()
     using types    = seqan3::type_list<msa_seq_t, std::string>;
     using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
     using record_t = seqan3::sequence_record<types, fields>;
-    using sgr_t    = decltype(grouped)::value_type;
+    using sgr_t    = decltype(grouped)::value_type;  // std::unordered_map<msa_seq_t, target_count>;
     using sgr_p    = sgr_t*;
 
     // std::filesystem::path gr  = parent.dir / (gene + ".grouped-" + parent.fasta_name);
@@ -291,15 +291,34 @@ void SplitGene::write_grouped ()
     std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)    {return a->second.count > b->second.count;});
 
     for (sgr_p           sg :  gr_v            )   // pointers to grouped target_count   seq: target_count
-    for (auto& [year,    yc]:  sg->second.years)
-    for (auto& [month,   mc]:  yc.months   )  
-    for (auto& [day,     dc]:  mc.days     )
-    {    
-        
-        for (auto& [country, cc]:  dc.countries)
-        {
-            auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}", 
-                          cc.id.EPI_ISL, year, month, day, cc.count, country, cc.id.isolate);
+    {
+        // discard sequences with too many N.
+        if (std::all_of(sg->second.target.patterns.begin(), sg->second.target.patterns.end(), 
+                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
+            continue;
+
+        for (auto& [year,    yc]:  sg->second.years)
+        for (auto& [month,   mc]:  yc.months   )  
+        for (auto& [day,     dc]:  mc.days     )
+        {    
+            for (auto& [country, cc]:  dc.countries)
+            {
+                auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}", 
+                            cc.id.EPI_ISL, year, month, day, cc.count, country, cc.id.isolate);
+
+                for (auto& pq : sg->second.target.patterns)
+                {
+                    id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
+                                    pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
+                }
+                id += "|" + sg->second.target.target_pattern;    
+                file_e_grdc.push_back<record_t>( record_t{sg->first, std::move(id)} );
+            }
+
+            auto& [country, cc] =  *dc.countries.begin();
+            auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}",
+                        cc.id.EPI_ISL, year, month, day, dc.count, country, cc.id.isolate);
+
 
             for (auto& pq : sg->second.target.patterns)
             {
@@ -308,21 +327,8 @@ void SplitGene::write_grouped ()
             }
             id += "|" + sg->second.target.target_pattern;
                 
-            file_e_grdc.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
+            file_e_grd.push_back<record_t>( record_t{sg->first, std::move(id)} );
         }
-
-        auto& [country, cc] =  *dc.countries.begin();
-        auto id = std::format("{} |{:04d}-{:02d}-{:02d}|{}|{}|{}",
-                    cc.id.EPI_ISL, year, month, day, dc.count, country, cc.id.isolate);
-
-
-        for (auto& pq : sg->second.target.patterns)
-        {
-            id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
-                            pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
-        }
-            
-        file_e_grd.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
     }
 }
 
