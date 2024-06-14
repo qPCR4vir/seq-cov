@@ -229,8 +229,14 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq)
     int len = primer.seq.size();
     for (int i = 0; i < len; ++i)
     {
-        if      (target[i] == 'N'_dna15)                      pq.N++;
-        else if (!mismatch.score(primer.seq[i], target[i]))   continue;
+        if (!mismatch.score(primer.seq[i], target[i]))   continue;
+
+        if  (target[i] == 'N'_dna15)  
+        {
+            pq.N++;
+            pq.pattern[i] = 'N';
+            continue;
+        }
         pq.pattern[i] = target[i].to_char();
         pq.mm++;
         if (len - i <= parent.crit_term_nt)                   pq.crit++;
