@@ -99,9 +99,9 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             }
             else  // one reverse primer/prbe
             {
-                if ( !end || end < pr.end)  // extern reverse primer
+                if ( !end || end < pr.beg)  // extern reverse primer
                 {
-                    end = pr.end;
+                    end = pr.beg;
                     rev_idx = r_primers.size();
                 }
                 r_primers.push_back(pr);
