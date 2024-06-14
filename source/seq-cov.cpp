@@ -153,8 +153,34 @@ void SplitGene::align(pattern_q & pq, msa_seq_t& target)
                         //<< target <<'\n' ;
                         //<< pattern << '\n'  << target << '\n' ;  // << "Misatches: " << mm << ", Ns: " << N << ", crit: " << crit << '\n';
 }
+void SplitGene::target_pattern(target_q & tq, msa_seq_t& sq, long msa_beg, long msa_end)
+{
+    tq.target_pattern.clear();
+    tq.target_pattern.reserve(end-beg);
 
-void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
+    for ( int i = msa_beg; i <= msa_end; ++i)
+    {
+        if (parent.msa_ref[i].holds_alternative<seqan3::gap>() &&
+                        sq[i].holds_alternative<seqan3::gap>()    )           continue;
+
+        if (parent.msa_ref[i].holds_alternative<seqan3::gap>() ||
+                        sq[i].holds_alternative<seqan3::gap>()    )          
+        {    
+            tq.target_pattern.push_back(sq[i].to_char());     
+            continue;  
+        }      
+        auto s =             sq[i].convert_unsafely_to<oligo_seq_alph>();
+        auto r = parent.msa_ref[i].convert_unsafely_to<oligo_seq_alph>();
+        if (!mismatch.score(s, r))   
+        { 
+            tq.target_pattern.push_back('.');  
+            continue;
+        }
+        tq.target_pattern.push_back(s.to_char());   
+    }
+}
+
+void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq, long msa_beg, long msa_end)
 {
     for (auto & primer : all_oligos)  // todo: parallelize (std::execution::par)
     {
@@ -164,6 +190,7 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
     {
         evaluate_target_primer(pq, sq);
     });
+    target_pattern(tq, sq, msa_beg, msa_end);
 
     /*for (auto & primer : f_primers)
     {
@@ -228,7 +255,7 @@ target_count& SplitGene::check_rec(auto& record)
 
     target_count & target_c = grouped[{sq.begin()+msa_beg, sq.begin()+msa_end}];  // todo: check if it is new
     if (!target_c.count)  // new target sequence
-        evaluate_target(target_c.target, sq);
+        evaluate_target(target_c.target, sq, msa_beg, msa_end);
     
     target_c.count++;
     return target_c;   
@@ -273,6 +300,7 @@ void SplitGene::write_grouped ()
                 id += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
                                 pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
             }
+            id += "|" + sg->second.target.target_pattern;
                 
             file_e_grdc.push_back<record_t>( record_t{std::move(sg->first), std::move(id)} );
         }

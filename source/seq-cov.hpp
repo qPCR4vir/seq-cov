@@ -90,6 +90,7 @@ struct pattern_q
 struct target_q
 {
     std::vector<pattern_q> patterns;
+    std::string target_pattern;
 };
 struct parsed_id
 {
@@ -147,7 +148,8 @@ struct SplitGene
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
-    void evaluate_target(target_q &tq, msa_seq_t &target);
+    void evaluate_target(target_q &tq, msa_seq_t &target, long msa_beg, long msa_end);
+    void target_pattern (target_q &pq, msa_seq_t &target, long msa_pos, long msa_end);
     void evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq);
     void align(pattern_q &pq, msa_seq_t &target);
 
