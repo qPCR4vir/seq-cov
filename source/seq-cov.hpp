@@ -133,6 +133,7 @@ struct SplitGene
     const std::string   gene;
     int                 forw_idx{}, rev_idx{};    
     std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
+    std::vector<oligo> all_oligos;
 
     bool read_oligos(const std::filesystem::path& oligos);
 
@@ -147,7 +148,7 @@ struct SplitGene
     /// record identified and ...?
     target_count& check_rec(auto& record);
     void evaluate_target(target_q &tq, msa_seq_t &target);
-    void evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq);
+    void evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq);
     void align(pattern_q &pq, msa_seq_t &target);
 
     bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,

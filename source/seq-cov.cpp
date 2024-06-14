@@ -3,10 +3,12 @@
 #include <iostream>
 #include <vector>
 #include <filesystem>
-//#include <algorithm>
+#include <algorithm>
 #include <unordered_map>
 #include <ranges>
 #include <stdexcept>
+#include <execution>
+
 	
 // #include <seqan3/std/ranges>                    // include all of the standard library's views
 #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
@@ -57,6 +59,13 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
         beg = end = 0;
+        f_primers.clear();
+        r_primers.clear();
+        probes_s.clear();
+        probes_a.clear();
+        int forw_idx{0}, rev_idx{0};
+        all_oligos.clear();
+
         for (auto & primer : file_in)
         {
             std::string id = std::move(primer.id());
@@ -84,7 +93,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
                     beg = pr.beg;
                     forw_idx = f_primers.size();
                 }   
-                f_primers.push_back(pr);                     
+                f_primers.push_back(pr);   
+                all_oligos.push_back(pr);                  
                 continue;
             }
             else  // one reverse primer/prbe
@@ -95,9 +105,15 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
                     rev_idx = r_primers.size();
                 }
                 r_primers.push_back(pr);
+                all_oligos.push_back(pr);    
                 continue;
             }
         }
+        /*for (auto & primer : f_primers) all_oligos.push_back(&primer);
+        for (auto & primer : r_primers) all_oligos.push_back(&primer);
+        for (auto & primer : probes_s) all_oligos.push_back(&primer);
+        for (auto & primer : probes_a) all_oligos.push_back(&primer);*/
+
         return true;
 }
 
@@ -140,8 +156,16 @@ void SplitGene::align(pattern_q & pq, msa_seq_t& target)
 
 void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
 {
+    for (auto & primer : all_oligos)  // todo: parallelize (std::execution::par)
+    {
+        tq.patterns.emplace_back(primer);
+    }
+    std::for_each(std::execution::par, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    {
+        evaluate_target_primer(pq, sq);
+    });
 
-    for (auto & primer : f_primers)
+    /*for (auto & primer : f_primers)
     {
         evaluate_target_primer(tq, primer, sq);
     }
@@ -165,9 +189,10 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq)
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  */}
 
-void SplitGene::evaluate_target_primer(cov::target_q &tq, cov::oligo &primer, cov::msa_seq_t &sq)
+void SplitGene::evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq)
 {
-    pattern_q &pq = tq.patterns.emplace_back(primer);
+    // pattern_q &pq = tq.patterns.emplace_back(primer);
+    cov::oligo &primer = pq.primer;
     oligo_seq_t target;
     reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
     if (target.size() != primer.seq.size())
@@ -357,19 +382,20 @@ void SplitCoVfasta::split_fasta( )
         parsed_id pid;
         parse_id(record.id(), pid);
 
-        for (auto & gene : genes)             // for each sequence, check each gene/target
+
+        std::for_each(std::execution::par, genes.begin(), genes.end(), [&](auto& gene) 
         {
-            target_count &tc = gene.check_rec(record);
-            year_count &yc = tc.years[pid.year];
+            target_count& tc = gene.check_rec(record);
+            year_count& yc = tc.years[pid.year];
             yc.count++;
-            month_count &mc = yc.months[pid.month];
+            month_count& mc = yc.months[pid.month];
             mc.count++;
-            day_count &dc = mc.days[pid.day];
+            day_count& dc = mc.days[pid.day];
             dc.count++;
-            country_count &cc = dc.countries[pid.country];
+            country_count& cc = dc.countries[pid.country];
             if (!cc.count) cc.id = pid;
             cc.count++;
-        }
+        });
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
         {
@@ -380,7 +406,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        //if (t>10) break;
+        //if (t>700000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
