@@ -423,7 +423,7 @@ void SplitCoVfasta::split_fasta( )
         parse_id(record.id(), pid);
 
 
-        std::for_each(std::execution::par, genes.begin(), genes.end(), [&](auto& gene) 
+        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
         {
             target_count& tc = gene.check_rec(record);
             year_count& yc = tc.years[pid.year];
