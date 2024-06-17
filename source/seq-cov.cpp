@@ -22,6 +22,7 @@
 #include <seqan3/alignment/configuration/align_config_method.hpp>
 #include <seqan3/alignment/pairwise/align_pairwise.hpp>
 #include <seqan3/alignment/configuration/align_config_edit.hpp>
+#include <seqan3/alignment/configuration/align_config_output.hpp>
 
 #include "seq-cov.hpp"
 
@@ -39,7 +40,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-SplitGene::SplitGene(SplitCoVfasta const &parent, std::string gene)
+SplitGene::SplitGene(SplitCoVfasta &parent, std::string gene)
         : parent{parent}, gene{gene}
 {
     
@@ -90,6 +91,13 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             if (pr.ref_beg < pr.ref_end)   
             {
                 pr.reverse = false;
+
+                // throw std::runtime_error if incorrect lenth of the primer
+                if (pr.len != (pr.ref_end - pr.ref_beg + 1)) 
+                    throw std::runtime_error{"Forward primer " + pr.name + " has incorrect length: " + std::to_string(pr.len) +
+                    " instead of " + std::to_string(pr.ref_end - pr.ref_beg + 1) + " at position " + std::to_string(pr.ref_beg) 
+                    + " to " + std::to_string(pr.ref_end)};
+
                 if ( !ref_beg || ref_beg > pr.ref_beg)  // extern forward primer
                 {
                     ref_beg = pr.ref_beg;
@@ -102,6 +110,13 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             else   
             {
                 pr.reverse = true;
+
+                // throw std::runtime_error if incorrect lenth of the primer
+                if (pr.len != (pr.ref_beg - pr.ref_end + 1)) 
+                    throw std::runtime_error{"Reverse primer " + pr.name + " has incorrect length: " + std::to_string(pr.len) +
+                    " instead of " + std::to_string(pr.ref_beg - pr.ref_end + 1) + " at position " + std::to_string(pr.ref_beg) 
+                    + " to " + std::to_string(pr.ref_end)};
+
                 if ( !ref_end || ref_end < pr.ref_beg)  // extern reverse primer
                 {
                     ref_end = pr.ref_beg;
@@ -305,23 +320,23 @@ void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  
 }
-void SplitGene::target_pattern(target_q & tq, msa_seq_t& sq, long msa_beg, long msa_end)
+void SplitGene::target_pattern(target_q & tq, const msa_seq_t& full_target)
 {
     tq.target_pattern.clear();
-    tq.target_pattern.reserve(end-beg);
+    tq.target_pattern.reserve(ref_len);
 
     for ( int i = msa_beg; i <= msa_end; ++i)
     {
         if (parent.msa_ref[i].holds_alternative<seqan3::gap>() &&
-                        sq[i].holds_alternative<seqan3::gap>()    )           continue;
+               full_target[i].holds_alternative<seqan3::gap>()    )           continue;
 
         if (parent.msa_ref[i].holds_alternative<seqan3::gap>() ||
-                        sq[i].holds_alternative<seqan3::gap>()    )          
+               full_target[i].holds_alternative<seqan3::gap>()    )          
         {    
-            tq.target_pattern.push_back(sq[i].to_char());     
+            tq.target_pattern.push_back(full_target[i].to_char());     
             continue;  
         }      
-        auto s =             sq[i].convert_unsafely_to<oligo_seq_alph>();
+        auto s =    full_target[i].convert_unsafely_to<oligo_seq_alph>();
         auto r = parent.msa_ref[i].convert_unsafely_to<oligo_seq_alph>();
         if (!mismatch.score(s, r))   
         { 
@@ -332,34 +347,24 @@ void SplitGene::target_pattern(target_q & tq, msa_seq_t& sq, long msa_beg, long 
     }
 }
 
-void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq, long msa_beg, long msa_end)
+void SplitGene::evaluate_target(target_q & tq, const msa_seq_t& full_target)
 {
-    for (auto & primer : all_oligos)  // todo: parallelize (std::execution::par)
+    for (oligo& primer : all_oligos)   
     {
-        tq.patterns.emplace_back(primer);
+        tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
-    std::for_each(std::execution::par, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    //std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    for (pattern_q& pq : tq.patterns)   
     {
-        evaluate_target_primer(pq, sq);
-    });
-    target_pattern(tq, sq, msa_beg, msa_end);
+        evaluate_target_primer(pq, full_target);
+    }//);
+    target_pattern(tq, full_target);
 
-    /*for (auto & primer : f_primers)
-    {
-        evaluate_target_primer(tq, primer, sq);
-    }
-    for (auto & primer : r_primers)
-    {
-        evaluate_target_primer(tq, primer, sq);
-    }
-    for (auto & probe : probes_s)
-    {
-        evaluate_target_primer(tq, probe, sq);
-    }
-    for (auto & probe : probes_a)
-    {
-        evaluate_target_primer(tq, probe, sq);
-    }
+    /*
+    for (auto & primer : f_primers) evaluate_target_primer(tq, primer, sq);
+    for (auto & primer : r_primers) evaluate_target_primer(tq, primer, sq);
+    for (auto & probe  : probes_s ) evaluate_target_primer(tq, probe , sq);
+    for (auto & probe  : probes_a ) evaluate_target_primer(tq, probe , sq);
     /* for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
@@ -368,39 +373,35 @@ void SplitGene::evaluate_target(target_q & tq, msa_seq_t& sq, long msa_beg, long
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  */}
 
-void SplitGene::evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq)
+void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_target)
 {
-    // pattern_q &pq = tq.patterns.emplace_back(primer);
     cov::oligo &primer = pq.primer;
-    oligo_seq_t target;
-    reconstruct_seq(sq, target, primer.beg, primer.end, msa_target_pos, primer.seq.size());
-    if (target.size() != primer.seq.size())
-        return align(pq, sq); // todo: try to align the primer with the target sequence
+    oligo_seq_t oligo_target;
+    reconstruct_seq(full_target, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
     if (oligo_target.size() != primer.len)
         return align(pq, full_target); // todo: try to align the primer with the oligo_target sequence
         // return re_align(pq, oligo_target); // todo: try to align the primer with the oligo_target sequence
  
-    pq.pattern = std::string(primer.seq.size(), '.');
-    int len = primer.seq.size();
-    for (int i = 0; i < len; ++i)
+    pq.pattern = std::string(primer.len, '.');
+    for (int i = 0; i < primer.len; ++i)
     {
-        if (!mismatch.score(primer.seq[i], target[i]))   continue;
+        if (!mismatch.score(primer.seq[i], oligo_target[i]))   continue;
 
-        if  (target[i] == 'N'_dna15)  
+        if  (oligo_target[i] == 'N'_dna15)  
         {
             pq.N++;
             pq.pattern[i] = 'N';
             continue;
         }
-        pq.pattern[i] = target[i].to_char();
+        pq.pattern[i] = oligo_target[i].to_char();
         pq.mm++;
-        if (len - i <= parent.crit_term_nt)                   pq.crit++;
+        if (i >= primer.len - parent.crit_term_nt)                   pq.crit++;
      }
     pq.Q = pq.mm + pq.crit * 4;
 /*     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
-                             << target << '\n' 
+                             << oligo_target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  */
 }
@@ -616,7 +617,8 @@ void SplitCoVfasta::split_fasta( )
         parse_id(record.id(), pid);
 
 
-        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        //std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        for (auto & gene : genes)  // todo: parallelize (std::execution::par)
         {
             target_count& tc = gene.check_rec(record);
             year_count& yc = tc.years[pid.year];
@@ -628,7 +630,7 @@ void SplitCoVfasta::split_fasta( )
             country_count& cc = dc.countries[pid.country];
             if (!cc.count) cc.id = pid;
             cc.count++;
-        });
+        }//);
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
         {
