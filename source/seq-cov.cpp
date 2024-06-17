@@ -155,13 +155,75 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
     return true;
 }
 
-void SplitGene::align(pattern_q & pq, msa_seq_t& target)
+}
+void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
+                    const msa_seq_t &full_target)
 {
-    static long count{0L};
-    count++;
-    seqan3::debug_stream << "\n " << count << ": To do - align Primer: " << pq.primer.name << " \n" ;
-                        //<< target <<'\n' ;
-                        //<< pattern << '\n'  << target << '\n' ;  // << "Misatches: " << mm << ", Ns: " << N << ", crit: " << crit << '\n';
+    oligo_seq_t oligo_target;
+    msa_seq_t   msa_fragment;
+    cov::oligo &primer = pq.primer;
+    parent.extract_seq(full_target, msa_fragment, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
+
+    pq.pattern.clear();
+    pq.pattern.reserve(primer.seq.size()+1);
+    
+    // go through the sequence and eliminate gaps to reconstruct the original sequence
+
+    for ( int i = 0, p=0; i < primer.msa_len; ++i)
+    {
+        // debug nt in ref and pr
+        //seqan3::debug_stream << "nt ref: " << primer.msa_ref[i] << ", nt in pr" << msa_fragment[i] <<'\n';
+        
+        if (primer.msa_ref[i].holds_alternative<seqan3::gap>() &&
+              msa_fragment[i].holds_alternative<seqan3::gap>()    )           continue;
+
+        if (msa_fragment[i].holds_alternative<seqan3::gap>()    )     // deletion in target (or insertion in ref?)
+        {
+            pq.pattern.push_back('-');  
+            continue;
+        }
+        auto s = msa_fragment[i].convert_unsafely_to<oligo_seq_alph>();        
+        if (primer.msa_ref[i].holds_alternative<seqan3::gap>())  // insertion in target (or deletion in ref?)
+        {
+            if (!mismatch.score(s, primer.seq[p]))               // the inserted base is in the primer ????
+            { 
+                pq.pattern.push_back('.'); 
+                ++p; 
+                continue;
+            }
+            // assume ???? that the inserted base is not in the primer
+            pq.pattern.push_back(msa_fragment[i].to_char());  // inserted in the pattern but not advance the primer
+            pq.mm++;
+            if (primer.len - p <= parent.crit_term_nt)                   pq.crit++;
+            continue;
+        }
+
+        if (!mismatch.score(s, primer.seq[p]))     
+        { 
+            pq.pattern.push_back('.');  
+            ++p;
+            continue;
+        }
+        ++p;        
+        pq.pattern.push_back(s.to_char());   
+        if  (s == 'N'_dna15)  
+        {
+            pq.N++;
+            continue;
+        }
+        pq.mm++;
+        if (i >= primer.len - parent.crit_term_nt)                   pq.crit++;
+    }
+    pq.Q = pq.mm + pq.crit * 4;
+    
+     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                             << pq.primer.seq <<" - oligo \n" 
+                             << pq.pattern << '\n'
+                             << oligo_target << '\n'
+                             << pq.primer.msa_ref << " -ref" << '\n'
+                             << msa_fragment << '\n' 
+                             << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
+ 
 }
 void SplitGene::target_pattern(target_q & tq, msa_seq_t& sq, long msa_beg, long msa_end)
 {

@@ -149,10 +149,14 @@ struct SplitGene
 
     bool read_oligos(const std::filesystem::path& oligos);
 
+    // References and pointers to either key or data stored in the container 
+    // are only invalidated by erasing that element, even when the corresponding 
+    // iterator is invalidated.
     using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
     grouped_by_seq      grouped; 
+    int                 count{0}; 
 
-    SplitGene( SplitCoVfasta const &parent, std::string gene);
+    SplitGene( SplitCoVfasta &parent, std::string gene);
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
