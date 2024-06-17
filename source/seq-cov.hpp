@@ -160,9 +160,10 @@ struct SplitGene
     void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
     void align   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target);
+    void re_align(pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);
 
     bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,
-                         int &beg, int &end, std::vector<int> &msa_pos, int tent_len);
+                         long msa_beg, long msa_end, int tent_len);
     void write_grouped ();
 };    
 
@@ -205,6 +206,10 @@ class SplitCoVfasta
 
     void split_fasta( );
     void set_ref_pos();
+    bool extract_seq(const msa_seq_t &full_msa_seq, 
+                               msa_seq_t &msa_fragment, 
+                             oligo_seq_t &reconstructed_seq,
+                        long msa_beg, long msa_end, int tent_len = 0) ;
     void parse_id(const std::string& id, parsed_id& pid);
 };
 

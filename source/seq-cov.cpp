@@ -149,9 +149,8 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
     //seqan3::debug_stream << msa_seq_t{full_msa_seq.begin()+ msa_beg, full_msa_seq.begin() + msa_end} << '\n';
     for ( int i = msa_beg; i <= msa_end; ++i)
     {
-        if (s[i].holds_alternative<seqan3::gap>() ) continue;
-        seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>());
-        msa_pos.push_back(i);
+        if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
+        seq.push_back(full_msa_seq[i].convert_unsafely_to<oligo_seq_alph>());
     }
     return true;
 }
@@ -340,7 +339,49 @@ void SplitGene::write_grouped ()
 }
 
 // class SplitCoVfasta
- 
+
+bool SplitCoVfasta::extract_seq(const msa_seq_t &full_msa_seq, 
+                                          msa_seq_t &msa_fragment, 
+                                        oligo_seq_t &reconstructed_seq,
+                        long msa_beg, long msa_end, int tent_len )  // = 0
+{
+    //seqan3::debug_stream << "\nReconstructing sequence from MSA pos " << msa_beg << " to " << msa_end << '\n';
+    //seqan3::debug_stream <<  msa_pos.size() << '\t';
+
+    reconstructed_seq.clear();
+    if (tent_len) reconstructed_seq.reserve(tent_len);
+
+    bool reverse = (msa_beg > msa_end);
+    long len = msa_end - msa_beg + 1;
+    // go through the sequence and eliminate gaps to reconstruct the original sequence
+    if (reverse) 
+    {
+        // original sequence is in reverse order
+        msa_fragment.reserve(-len);
+        for ( int i = msa_beg; i >= msa_end; --i)
+        {
+            if (full_msa_seq[i].holds_alternative<seqan3::gap>() )
+            {
+                msa_fragment.push_back(seqan3::gap{});
+                continue;    
+            }
+            auto b = full_msa_seq[i].convert_unsafely_to<oligo_seq_alph>().complement();
+            msa_fragment.push_back(b);
+            reconstructed_seq.push_back(b);
+        }
+        return true;
+    }
+    // original sequence is in the same order
+    msa_fragment.reserve(len);
+    for ( int i = msa_beg; i <= msa_end; ++i)
+    {
+            auto b = full_msa_seq[i];
+            msa_fragment.push_back(b);
+            if (b.holds_alternative<seqan3::gap>() ) continue;
+            reconstructed_seq.push_back(b.convert_unsafely_to<oligo_seq_alph>());
+    }
+    return true;
+}
 void SplitCoVfasta::set_ref_pos( )
 {
     // Initialise a file input object with a FASTA file.
