@@ -76,9 +76,13 @@ struct OLIGO : seqan3::sequence_file_input_default_traits_dna
 
 struct oligo
 {
-    oligo_seq_t   seq;
+    oligo_seq_t       seq, ref_seq;
+    msa_seq_t     msa_seq, msa_ref;
     std::string   name, code;
-    int           beg{0}, end{0}, match{0};
+    long          ref_beg{0}, ref_end{0}, 
+                  msa_beg{0}, msa_end{0};
+    int           match{0}, len{0}, msa_len{0};
+    bool          reverse{false}, is_probe{false};
 };
 
 struct pattern_q

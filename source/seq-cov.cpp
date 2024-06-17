@@ -78,17 +78,18 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 
             std::string seq_pos = id.substr(id.find("Seq pos: ") + 9);
             size_t dash_pos = seq_pos.find("-");
-            pr.beg = std::stoi(seq_pos.substr(0, dash_pos));
-            pr.end = std::stoi(seq_pos.substr(dash_pos + 1));
+            pr.ref_beg = std::stoi(seq_pos.substr(0, dash_pos));
+            pr.ref_end = std::stoi(seq_pos.substr(dash_pos + 1));
             // todo check if beg, end are valid
-            seqan3::debug_stream << " with beg: " << pr.beg << " and end: " << pr.end;
-            pr.seq  = primer.sequence();
-            pr.match = std::round(parent.match * double(pr.seq.size()) / 100.0);
+            seqan3::debug_stream << " with beg: " << pr.ref_beg << " and end: " << pr.ref_end;
+            pr.seq  = std::move(primer.sequence());
+            pr.len  = pr.seq.size();
+            pr.match = std::round(parent.match * double(pr.len) / 100.0);
             seqan3::debug_stream << " with minimum matches:" << pr.match;
 
-            if (pr.beg < pr.end)  // one forward primer/prbe
+            if (pr.ref_beg < pr.ref_end)   
             {
-                if ( !beg || beg > pr.beg)  // extern forward primer
+                pr.reverse = false;
                 {
                     beg = pr.beg;
                     forw_idx = f_primers.size();
