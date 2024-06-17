@@ -551,7 +551,28 @@ void SplitCoVfasta::set_ref_pos( )
 
     seqan3::debug_stream << "\n\nMSA Reference: " << ref_rec.id() << ",\t MSA lenth = " << msa_len << ", reference lenth = " << ref_seq.size() << '\n';
     
-    // for (auto & gene : genes) gene.set_ref_pos(); \todo: check correct positions of primers on the reference sequence
+    // for (auto & gene : genes) gene.set_ref_pos(); Set/Check correct positions of primers on the reference sequence
+    for (auto & gene : genes) 
+    {
+        // set gene target positions, First check ref_beg and ref_end were alrready set (in read_oligos)
+        if (gene.ref_beg == gene.ref_end) // run time error if not set
+            throw std::runtime_error{"Primer " + gene.gene + " has no reference positions set"};
+        gene.msa_beg = msa_pos[gene.ref_beg-1];
+        gene.msa_end = msa_pos[gene.ref_end-1];
+        gene.msa_len = gene.msa_end - gene.msa_beg + 1;
+        
+        // check all primers
+        for (auto & primer : gene.all_oligos)
+        {
+            if (primer.ref_beg == primer.ref_end) // run time error if not set
+                throw std::runtime_error{"Primer " + primer.name + " has no reference positions set"};
+            primer.msa_beg = msa_pos[primer.ref_beg-1];
+            primer.msa_end = msa_pos[primer.ref_end-1];
+            primer.msa_len = primer.msa_end - primer.msa_beg + 1;
+            extract_seq(msa_ref, primer.msa_ref, primer.ref_seq, primer.msa_beg, primer.msa_end, primer.seq.size());
+        }
+
+    }
 
 }
 
