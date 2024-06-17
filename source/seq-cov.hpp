@@ -134,16 +134,20 @@ struct SplitGene
 {
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; // hamming distance is default
 
-    SplitCoVfasta const &parent;
+    SplitCoVfasta  &parent;
     const std::string   gene;
-    int                 forw_idx{}, rev_idx{};    
     std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
-    std::vector<oligo> all_oligos;
+    std::vector<oligo>  all_oligos;
+    int                 forw_idx{}, rev_idx{};    
+
+    //oligo_seq_t   ref_seq;
+    //msa_seq_t     msa_ref;
+    long          ref_beg{0}, ref_end{0}, 
+                  msa_beg{0}, msa_end{0};
+    int           msa_len{0}, ref_len{0};
+    //bool          reverse{false};
 
     bool read_oligos(const std::filesystem::path& oligos);
-
-    std::vector<int>    msa_target_pos;
-    int                 beg{0}, end{0}, count{0}; 
 
     using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
     grouped_by_seq      grouped; 
@@ -152,10 +156,10 @@ struct SplitGene
     
     /// record identified and ...?
     target_count& check_rec(auto& record);
-    void evaluate_target(target_q &tq, msa_seq_t &target, long msa_beg, long msa_end);
-    void target_pattern (target_q &pq, msa_seq_t &target, long msa_pos, long msa_end);
-    void evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq);
-    void align(pattern_q &pq, msa_seq_t &target);
+    void evaluate_target            (target_q  &tq, const msa_seq_t &full_target);
+    void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
+    void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
+    void align   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target);
 
     bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,
                          int &beg, int &end, std::vector<int> &msa_pos, int tent_len);

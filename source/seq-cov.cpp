@@ -58,7 +58,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         seqan3::debug_stream << "\nGoing to load: " << path_oligos.string();
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
-        beg = end = 0;
+        ref_beg = ref_end = 0;
         f_primers.clear();
         r_primers.clear();
         probes_s.clear();
@@ -90,19 +90,21 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             if (pr.ref_beg < pr.ref_end)   
             {
                 pr.reverse = false;
+                if ( !ref_beg || ref_beg > pr.ref_beg)  // extern forward primer
                 {
-                    beg = pr.beg;
+                    ref_beg = pr.ref_beg;
                     forw_idx = f_primers.size();
                 }   
                 f_primers.push_back(pr);   
                 all_oligos.push_back(pr);                  
                 continue;
             }
-            else  // one reverse primer/prbe
+            else   
             {
-                if ( !end || end < pr.beg)  // extern reverse primer
+                pr.reverse = true;
+                if ( !ref_end || ref_end < pr.ref_beg)  // extern reverse primer
                 {
-                    end = pr.beg;
+                    ref_end = pr.ref_beg;
                     rev_idx = r_primers.size();
                 }
                 r_primers.push_back(pr);
@@ -110,6 +112,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
                 continue;
             }
         }
+        ref_len = ref_end - ref_beg + 1;
+
         /*for (auto & primer : f_primers) all_oligos.push_back(&primer);
         for (auto & primer : r_primers) all_oligos.push_back(&primer);
         for (auto & primer : probes_s) all_oligos.push_back(&primer);
@@ -118,26 +122,32 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         return true;
 }
 
-bool SplitGene::reconstruct_seq(const msa_seq_t& s, oligo_seq_t& seq, 
-                                                int& beg, int& end, std::vector<int>& msa_pos, int tent_len)
+bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
+    //seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
+    //seqan3::debug_stream <<  parent.msa_pos.size() << "\t??";
+    //seqan3::debug_stream << parent.msa_pos[beg-1] << ", " << parent.msa_pos[end-1] << '\n';
+    
     seq.clear();
     seq.reserve(tent_len);
-    msa_pos.clear();
-    msa_pos.reserve(tent_len);
-    bool reverse = (beg > end);
+    bool reverse = (msa_beg > msa_end);
     // go through the sequence and eliminate gaps to reconstruct the original sequence
     if (reverse) 
     {
-        for ( int i = parent.msa_pos[beg-1]; i >= parent.msa_pos[end-1]; --i)
+        // original sequence is in reverse order
+        //seqan3::debug_stream << '?';
+        //seqan3::debug_stream << msa_seq_t{&full_msa_seq[msa_end], &full_msa_seq[msa_beg]} << '\n';
+        for ( int i = msa_beg; i >= msa_end; --i)
         {
-            if (s[i].holds_alternative<seqan3::gap>() ) continue;
-            seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>().complement());
-            msa_pos.push_back(i);
+            if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
+            seq.push_back(full_msa_seq[i].convert_unsafely_to<oligo_seq_alph>().complement());
         }
         return true;
     }
-    for ( int i = parent.msa_pos[beg-1]; i <= parent.msa_pos[end-1]; ++i)
+    // original sequence is in the same order
+    //seqan3::debug_stream << '?';
+    //seqan3::debug_stream << msa_seq_t{full_msa_seq.begin()+ msa_beg, full_msa_seq.begin() + msa_end} << '\n';
+    for ( int i = msa_beg; i <= msa_end; ++i)
     {
         if (s[i].holds_alternative<seqan3::gap>() ) continue;
         seq.push_back(s[i].convert_unsafely_to<oligo_seq_alph>());
@@ -253,16 +263,12 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, cov::msa_seq_t &sq)
 
 target_count& SplitGene::check_rec(auto& record)
 {
-    
-    msa_seq_t& sq = record.sequence();
+    msa_seq_t& full_target = record.sequence();
     count++;
-    long msa_beg{0}, msa_end{0};
-    if ( beg < end) { msa_beg = parent.msa_pos[beg-1]; msa_end = parent.msa_pos[end-1]; }
-    else            { msa_beg = parent.msa_pos[end-1]; msa_end = parent.msa_pos[beg-1]; }
 
-    target_count & target_c = grouped[{sq.begin()+msa_beg, sq.begin()+msa_end}];  // todo: check if it is new
+    target_count & target_c = grouped[{full_target.begin()+msa_beg, full_target.begin()+msa_end}]; 
     if (!target_c.count)  // new target sequence
-        evaluate_target(target_c.target, sq, msa_beg, msa_end);
+        evaluate_target(target_c.target, full_target);
     
     target_c.count++;
     return target_c;   
