@@ -375,11 +375,12 @@ void SplitGene::evaluate_target(target_q & tq, const msa_seq_t& full_target)
     {
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
-    //std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
-    for (pattern_q& pq : tq.patterns)   
+    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    //for (pattern_q& pq : tq.patterns)   
     {
         evaluate_target_primer(pq, full_target);
-    }//);
+    }//
+    );
     target_pattern(tq, full_target);
 
     /*
@@ -660,8 +661,8 @@ void SplitCoVfasta::split_fasta( )
         parse_id(record.id(), pid);
 
 
-        //std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
-        for (auto & gene : genes)  // todo: parallelize (std::execution::par)
+        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        //for (auto & gene : genes)  // todo: parallelize (std::execution::par)
         {
             target_count& tc = gene.check_rec(record);
             year_count& yc = tc.years[pid.year];
@@ -673,7 +674,8 @@ void SplitCoVfasta::split_fasta( )
             country_count& cc = dc.countries[pid.country];
             if (!cc.count) cc.id = pid;
             cc.count++;
-        }//);
+        }//
+        );
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
         {
