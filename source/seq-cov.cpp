@@ -15,7 +15,7 @@
 #include <seqan3/alphabet/hash.hpp>
 #include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
 //#include <seqan3/alphabet/range/hash.hpp>
-#include <seqan3/core/debug_stream.hpp>         // for debug_stream
+#include <seqan3/core/debug_stream.hpp>         
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
 #include <seqan3/argument_parser/all.hpp> 
@@ -140,8 +140,6 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
     //seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
-    //seqan3::debug_stream <<  parent.msa_pos.size() << "\t??";
-    //seqan3::debug_stream << parent.msa_pos[beg-1] << ", " << parent.msa_pos[end-1] << '\n';
     
     seq.clear();
     seq.reserve(tent_len);
@@ -150,8 +148,7 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
     if (reverse) 
     {
         // original sequence is in reverse order
-        //seqan3::debug_stream << '?';
-        //seqan3::debug_stream << msa_seq_t{&full_msa_seq[msa_end], &full_msa_seq[msa_beg]} << '\n';
+
         for ( int i = msa_beg; i >= msa_end; --i)
         {
             if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
@@ -160,8 +157,6 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
         return true;
     }
     // original sequence is in the same order
-    //seqan3::debug_stream << '?';
-    //seqan3::debug_stream << msa_seq_t{full_msa_seq.begin()+ msa_beg, full_msa_seq.begin() + msa_end} << '\n';
     for ( int i = msa_beg; i <= msa_end; ++i)
     {
         if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
@@ -171,6 +166,11 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
 }
 void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
 {
+    
+    seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                        << pq.primer.seq <<" - oligo seq\n" 
+                        << oligo_target << " - target seq\n" ;
+
     auto output_config = seqan3::align_cfg::output_score{}          | 
                          seqan3::align_cfg::output_begin_position{} |
                          seqan3::align_cfg::output_end_position{}   | 
@@ -188,68 +188,93 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
     //seqan3::debug_stream << " Going to check results\n"; 
     //for (auto & res : results)
     {
-        seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
-        seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-        seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
+        //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
+        //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+        //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
     
         if (res.score() > pq.primer.match)  // primer found. 
         {
             //brief Helper function to print elements of a tuple separately.
-            auto&[a_p, a_t] = res.alignment();
+            auto&[a_t, a_p] = res.alignment();
             pq.pattern.clear();
-            seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
-                                << pq.primer.seq <<'\n' 
-                                << oligo_target << '\n'
-                                << a_p << '\n'
-                                << a_t << '\n' ;
-            seqan3::debug_stream << " cont...\n" ;
-            /*for (int i = 0; i < len; ++i)
-            {
-                if (!mismatch.score(primer.seq[i], oligo_target[i]))   continue;
+            
+            int len_a_pr = a_p.size();
+            int len_a_tg = a_t.size(); 
+            int len = std::max(len_a_pr, len_a_tg);
 
-                if  (oligo_target[i] == 'N'_dna15)  
+            //seqan3::debug_stream << " cont...\n" ;
+            int o_p = res.sequence2_begin_position();
+            if (o_p) pq.pattern = std::string(o_p, '-');
+
+            for (int i = 0; i < len; ++i)
+            {
+                if (i >= len_a_pr)  // extra nt in aligned target ?? ignore ?
                 {
-                    pq.N++;
-                    pq.pattern[i] = 'N';
+                    if (o_p >= pq.primer.len) continue  ;  // ??
+                    o_p++;
+                    pq.pattern.push_back(a_t[i].to_char());   
+                    if  (a_t[i] == 'N'_dna15)  
+                    {
+                        pq.N++;
+                        continue;
+                    }
+                    pq.mm++;
+                    if (o_p >= pq.primer.len - parent.crit_term_nt)      pq.crit++;  // ?????
                     continue;
                 }
-                pq.pattern[i] = oligo_target[i].to_char();
+                if (i >= len_a_tg)  // no more aligned target?
+                {
+                    if (o_p >= pq.primer.len) continue  ;  // ??
+                    o_p++;
+                    pq.pattern.push_back('-');
+                    pq.mm++;
+                    if (o_p >= pq.primer.len - parent.crit_term_nt)                   pq.crit++;
+                    continue;
+                }
+                if (a_p[i].holds_alternative<seqan3::gap>() &&
+                    a_t[i].holds_alternative<seqan3::gap>()    )       continue;  // ??
+
+                if (a_t[i].holds_alternative<seqan3::gap>()    )     // deletion in target (or insertion in ref?)
+                {
+                    if (o_p >= pq.primer.len) continue  ;  // ??
+                    o_p++;
+                    pq.pattern.push_back('-');  
+                    continue;
+                }
+                auto t = a_t[i].convert_unsafely_to<oligo_seq_alph>();        
+                if (a_p[i].holds_alternative<seqan3::gap>())  // insertion in target 
+                {
+                    if (!o_p) continue;  // ignore insertions before primer
+                    // assume ???? that the inserted base is not in the primer
+                    pq.pattern.push_back(t.to_char());  // inserted in the pattern but not advance the primer
+                    pq.mm++;
+                    if (pq.primer.len - o_p <= parent.crit_term_nt)                   pq.crit++;  // ??
+                    continue;
+                }
+                auto p = a_p[i].convert_unsafely_to<oligo_seq_alph>();   
+                o_p++;
+                if (!mismatch.score(t, p))     
+                { 
+                    if  (t == 'N'_dna15)  
+                    {
+                        pq.N++;
+                        pq.pattern.push_back('N');  
+                        continue;
+                    }                    
+                    pq.pattern.push_back('.');  
+                    continue;
+                }   
+                pq.pattern.push_back(t.to_char());   
                 pq.mm++;
                 if (len - i <= parent.crit_term_nt)                   pq.crit++;
             }
             pq.Q = pq.mm + pq.crit * 4;
-            return;*/
-        }
-    }
-        /*template <typename char_t, typename tuple_t, std::size_t... I>
-        void print_tuple(debug_stream_type<char_t> & s, tuple_t && t, std::index_sequence<I...> const &)
-        {
-            using std::get;
-            s << '(';
-            ((s << (I == 0 ? "" : ",") << get<I>(t)), ...);
-            s << ')';
-        }
-        
-        sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;
-        if (len)  // not the first time/seq - the "ref." seq was already set
-        {
-            sg.end = sg.beg + len;
-            return sg; // only find fw pr pos. Don't count for insertions/deletions or bad rev.
-        }
-        else if (sg.beg < 0)
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
-            "the full forward primer. Score: " + std::to_string(res.score()) +
-            " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
-    }
-    else 
-    {
-        if (!len)
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
-                                        "the forward primer. Score: " + std::to_string(res.score() )};
-        else
-            sg.beg = notfound;  // mark beg pos as not found !!
-    }*/
 
+            seqan3::debug_stream << a_p << " - aligned oligo\n"
+                                 << pq.pattern << " - pattern\n"
+                                 << a_t << " - aligned target\n" ;
+            return;
+    }
 }
 void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
                     const msa_seq_t &full_target)
@@ -266,9 +291,6 @@ void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
 
     for ( int i = 0, p=0; i < primer.msa_len; ++i)
     {
-        // debug nt in ref and pr
-        //seqan3::debug_stream << "nt ref: " << primer.msa_ref[i] << ", nt in pr" << msa_fragment[i] <<'\n';
-        
         if (primer.msa_ref[i].holds_alternative<seqan3::gap>() &&
               msa_fragment[i].holds_alternative<seqan3::gap>()    )           continue;
 
@@ -379,8 +401,8 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_targ
     oligo_seq_t oligo_target;
     reconstruct_seq(full_target, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
     if (oligo_target.size() != primer.len)
-        return align(pq, full_target); // todo: try to align the primer with the oligo_target sequence
-        // return re_align(pq, oligo_target); // todo: try to align the primer with the oligo_target sequence
+        //return align(pq, full_target); // todo: try to align the primer with the oligo_target sequence
+        return re_align(pq, oligo_target); // todo: try to align the primer with the oligo_target sequence
  
     pq.pattern = std::string(primer.len, '.');
     for (int i = 0; i < primer.len; ++i)
