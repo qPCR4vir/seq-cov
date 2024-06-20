@@ -187,13 +187,12 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
     //auto results = seqan3::align_pairwise(std::tie(target, pq.primer.seq), config);
     //seqan3::debug_stream << " Going to check results\n"; 
     //for (auto & res : results)
+    // if (res.score() > pq.primer.match)  // primer found. 
     {
         //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
         //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
         //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
     
-        if (res.score() > pq.primer.match)  // primer found. 
-        {
             //brief Helper function to print elements of a tuple separately.
             auto&[a_t, a_p] = res.alignment();
             pq.pattern.clear();
@@ -266,9 +265,11 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                 }   
                 pq.pattern.push_back(t.to_char());   
                 pq.mm++;
-                if (len - i <= parent.crit_term_nt)                   pq.crit++;
+                if (o_p >= pq.primer.len - parent.crit_term_nt)                   pq.crit++;
             }
-            pq.Q = pq.mm + pq.crit * 4;
+            if (res.score() > pq.primer.match)  
+                pq.Q = pq.mm + pq.crit * 4;  // primer found. 
+            else pq.Q = 1000;
 
             seqan3::debug_stream << a_p << " - aligned oligo\n"
                                  << pq.pattern << " - pattern\n"
