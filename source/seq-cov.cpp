@@ -628,6 +628,21 @@ void SplitCoVfasta::set_ref_pos( )
 
 void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 {
+std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
+{ 
+    // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
+    // between the second and third '/'. Return empty string_view if not found.
+
+    std::size_t beg = virus_name.find('/', 8);
+    if (beg == std::string_view::npos) return std::string_view{};  
+
+    std::size_t end = virus_name.find('/', ++beg);
+    return virus_name.substr(beg, end - beg); 
+
+    // if the second '/' is found in the last position, beg will = size() and the result is an empty string_view
+
+}
+
     // >hCoV-19/Wuhan/WIV04/2019|EPI_ISL_402124|2019-12-30|China
     // d_2019-12-30_x_1_c_China - Wuhan_EPI_02124_i_WIV04_p_E_Sarbeco_F2_Q_0_mm_0_N_0_crit_0_pat_......................
     // >hCoV-19/Sweden/6332562676/2022|EPI_ISL_16076002|2022-11-28|Europe

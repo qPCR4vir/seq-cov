@@ -201,6 +201,8 @@ class SplitCoVfasta
  private:
     std::vector<SplitGene> genes;
     Metadata               metadata;
+    // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
+    static std::string_view isolate(const std::string_view virus_name);
 
  public:
     SplitCoVfasta(const std::filesystem::path& fasta,
