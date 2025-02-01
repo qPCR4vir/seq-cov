@@ -43,12 +43,29 @@ GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
         };
 
         // todo implement conditional split
-        Add_Gene(E);
-        Add_Gene(N);
-        Add_Gene(S);  
-        Add_Gene(R);
-
-        sp.split_fasta();
+        try
+            {
+                Add_Gene(E);
+                Add_Gene(N);
+                Add_Gene(S);  
+                Add_Gene(R);
+            }
+        catch (const std::exception& e)
+            {
+                nana::msgbox m(*this, "Error adding gene");
+                m << "An error occurred: " << e.what();
+                m.show();
+            }           
+        try
+        {
+            sp.split_fasta();
+        }
+        catch (const std::exception& e)
+        {
+            nana::msgbox m(*this, "Error splitting fasta");
+            m << "An error occurred: " << e.what();
+            m.show();
+        }
     });
 
     set.events().click([&]()
@@ -97,14 +114,16 @@ GeneGUI::GeneGUI(nana::window parent, std::string gene_name, std::string fw, std
             if (files.empty()) return;   
             
             this->input_file.reset(files[0].string());
-            seqan3::debug_stream << "\nGoing to load: " << files[0].string();
+            if constexpr (debugging) 
+            {  seqan3::debug_stream << "\nGoing to load: " << files[0].string(); }
             seqan3::sequence_file_input file_in{files[0]};
             std::string fw, rv;
             int fw_beg{0}, fw_end{0}, rv_beg{0}, rv_end{0};
             for (auto & primer : file_in)
             {
                 std::string id = std::move(primer.id());
-                seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
+                if constexpr (debugging) 
+                    seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
                 // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
                 std::string seq_pos = id.substr(id.find("Seq pos: ") + 9);
@@ -112,7 +131,8 @@ GeneGUI::GeneGUI(nana::window parent, std::string gene_name, std::string fw, std
                 int beg = std::stoi(seq_pos.substr(0, dash_pos));
                 int end = std::stoi(seq_pos.substr(dash_pos + 1));
                 // todo check if beg, end are valid
-                seqan3::debug_stream << " with beg: " << beg << " and end: " << end;
+                if constexpr (debugging) 
+                    seqan3::debug_stream << " with beg: " << beg << " and end: " << end;
 
                 if (beg < end)  // one forward primer/prbe
                 {

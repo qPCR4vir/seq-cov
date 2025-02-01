@@ -12,6 +12,10 @@
 #include <seqan3/core/debug_stream.hpp>         // for debug_stream
 //#include <seqan3/alignment/decorator/gap_decorator.hpp>
 
+constexpr bool debugging = true;  
+// todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
+
+
 namespace std
 {
 /*!\brief Struct for hashing a range of characters.
@@ -76,7 +80,7 @@ struct OLIGO : seqan3::sequence_file_input_default_traits_dna
 
 struct oligo
 {
-    oligo_seq_t       seq, ref_seq;
+    oligo_seq_t   seq, ref_seq;
     msa_seq_t     msa_seq, msa_ref;
     std::string   name, code;
     long          ref_beg{0}, ref_end{0}, 

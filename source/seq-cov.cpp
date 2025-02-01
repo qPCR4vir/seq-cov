@@ -26,6 +26,9 @@
 
 #include "seq-cov.hpp"
 
+// todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
+
+
 namespace cov
 {
 /*
@@ -56,7 +59,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 {
         if (path_oligos.empty()) return false;   // todo: more checks?
 
-        seqan3::debug_stream << "\nGoing to load: " << path_oligos.string();
+        if constexpr (debugging) 
+        {  seqan3::debug_stream << "\nGoing to load: " << path_oligos.string(); }
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
         ref_beg = ref_end = 0;
@@ -70,7 +74,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         for (auto & primer : file_in)
         {
             std::string id = std::move(primer.id());
-            seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
+            if constexpr (debugging) 
+                seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
             // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
             oligo pr;
@@ -86,7 +91,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             pr.seq  = std::move(primer.sequence());
             pr.len  = pr.seq.size();
             pr.match = std::round(parent.match * double(pr.len) / 100.0);
-            seqan3::debug_stream << " with minimum matches:" << pr.match;
+            if constexpr (debugging) 
+                seqan3::debug_stream << " with minimum matches:" << pr.match;
 
             if (pr.ref_beg < pr.ref_end)   
             {
@@ -139,7 +145,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 
 bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
-    //seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
+    if constexpr (debugging) 
+                seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
     
     seq.clear();
     seq.reserve(tent_len);
@@ -164,9 +171,10 @@ bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq,
     }
     return true;
 }
+
 void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
 {
-    
+    if constexpr (debugging) 
     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                         << pq.primer.seq <<" - oligo seq\n" 
                         << oligo_target << " - target seq\n" ;
@@ -181,17 +189,24 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
     /*seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, 
                                                     seqan3::align_cfg::extension_score{-1}};*/
     auto config = method |  scheme |output_config; // gap_costs |
-    //seqan3::debug_stream << "\nTarget: " << oligo_target << "\nPrimer: " << pq.primer.seq << '\n';
-    
+    if constexpr (debugging) 
+                seqan3::debug_stream << "\nTarget: " << oligo_target << "\nPrimer: " << pq.primer.seq << '\n';
+
+    if constexpr (debugging) 
+                seqan3::debug_stream << " Going to check results\n";     
+
     for (auto const & res : seqan3::align_pairwise(std::tie(oligo_target, pq.primer.seq), config))
     //auto results = seqan3::align_pairwise(std::tie(target, pq.primer.seq), config);
-    //seqan3::debug_stream << " Going to check results\n"; 
+
     //for (auto & res : results)
     // if (res.score() > pq.primer.match)  // primer found. 
     {
-        //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
-        //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-        //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
+        if constexpr (debugging) 
+                seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
+        if constexpr (debugging) 
+                seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+        if constexpr (debugging) 
+                seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
     
             //brief Helper function to print elements of a tuple separately.
             auto&[a_t, a_p] = res.alignment();
@@ -201,7 +216,8 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
             int len_a_tg = a_t.size(); 
             int len = std::max(len_a_pr, len_a_tg);
 
-            //seqan3::debug_stream << " cont...\n" ;
+            if constexpr (debugging) 
+                seqan3::debug_stream << " cont...\n" ;
             int o_p = res.sequence2_begin_position();
             if (o_p) pq.pattern = std::string(o_p, '-');
 
@@ -271,12 +287,13 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                 pq.Q = pq.mm + pq.crit * 4;  // primer found. 
             else pq.Q = 1000;
 
-            seqan3::debug_stream << a_p << " - aligned oligo\n"
+            seqan3::debug_stream << a_p        << " - aligned oligo\n"
                                  << pq.pattern << " - pattern\n"
-                                 << a_t << " - aligned target\n" ;
+                                 << a_t        << " - aligned target\n" ;
             return;
     }
 }
+
 void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
                     const msa_seq_t &full_target)
 {
@@ -422,12 +439,12 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_targ
         if (i >= primer.len - parent.crit_term_nt)                   pq.crit++;
      }
     pq.Q = pq.mm + pq.crit * 4;
-/*     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+        seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
                              << oligo_target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
- */
+ 
 }
 
 target_count& SplitGene::check_rec(auto& record)
@@ -515,8 +532,8 @@ bool SplitCoVfasta::extract_seq(const msa_seq_t &full_msa_seq,
                                         oligo_seq_t &reconstructed_seq,
                         long msa_beg, long msa_end, int tent_len )  // = 0
 {
-    //seqan3::debug_stream << "\nReconstructing sequence from MSA pos " << msa_beg << " to " << msa_end << '\n';
-    //seqan3::debug_stream <<  msa_pos.size() << '\t';
+    seqan3::debug_stream << "\nReconstructing sequence from MSA pos " << msa_beg << " to " << msa_end << '\n';
+    seqan3::debug_stream <<  msa_pos.size() << '\t';
 
     reconstructed_seq.clear();
     if (tent_len) reconstructed_seq.reserve(tent_len);
@@ -612,7 +629,7 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     // hCoV-19/Ireland/D-NVRL-Z21IRL04853/2021|EPI_ISL_8349991|2021-12-13|Europe
 
     std::size_t country_beg = 8;
-    std::size_t country_end = id.find('/',             8) - 1;          
+    std::size_t country_end = id.find('/',   country_beg) - 1;          
     std::size_t country_len = country_end - country_beg   + 1;
     std::size_t isolate_beg = country_end                 + 2;
     std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
@@ -638,9 +655,9 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     std::from_chars(m, d    , pid.month); 
     std::from_chars(d, d + 3, pid.day  );
 
-/*     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
+     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
                          << pid.year << " - " << pid.month << " - " << pid.day 
-                         << " - " << pid.country << '\n' ; */
+                         << " - " << pid.country << '\n' ; 
 
 }
 
@@ -700,6 +717,8 @@ void SplitCoVfasta::split_fasta( )
 
 }
 
+}  // namespace cov
+
 /* https://docs.seqan.de/seqan3/main_user/cookbook.html 
 Reading records in chunks
 #include <seqan3/io/sequence_file/all.hpp>
@@ -717,6 +736,5 @@ int main()
         seqan3::debug_stream << "ID:  " << (*records.begin()).id() << '\n'; // prints first ID in batch
     }
 The example above will iterate over the file by reading 10 records at a time. If no 10 records are available anymore, it will just print the remaining records.
-*/
-
 }
+*/
