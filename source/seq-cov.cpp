@@ -292,6 +292,12 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                                  << a_t        << " - aligned target\n" ;
             return;
     }
+    pq.Q = 1000;
+    auto tostring = oligo_target | seqan3::views::to_char;
+    pq.pattern = std::string{tostring.begin(), tostring.end()};
+    seqan3::debug_stream << pq.primer.seq << " - unaligned oligo\n"
+                         << pq.pattern    << " - unaligned pattern\n"
+                         << oligo_target  << " - unaligned target\n" ;
 }
 
 void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
@@ -405,14 +411,14 @@ void SplitGene::evaluate_target(target_q & tq, const msa_seq_t& full_target)
     for (auto & primer : f_primers) evaluate_target_primer(tq, primer, sq);
     for (auto & primer : r_primers) evaluate_target_primer(tq, primer, sq);
     for (auto & probe  : probes_s ) evaluate_target_primer(tq, probe , sq);
-    for (auto & probe  : probes_a ) evaluate_target_primer(tq, probe , sq);
-    /* for (auto & pq : tq.patterns)
+    for (auto & probe  : probes_a ) evaluate_target_primer(tq, probe , sq); */
+    for (auto & pq : tq.patterns)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
                              //<< target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
- */}
+ }
 
 void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_target)
 {
@@ -569,6 +575,7 @@ bool SplitCoVfasta::extract_seq(const msa_seq_t &full_msa_seq,
     }
     return true;
 }
+
 void SplitCoVfasta::set_ref_pos( )
 {
     // Initialise a file input object with a FASTA file.
@@ -628,6 +635,18 @@ void SplitCoVfasta::set_ref_pos( )
 
 void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 {
+    // parse the id of the fasta record, like:
+    // hCoV-19/USA/CO-CDPHE-2010040598/2020|2020-10-02|2021-09-04 
+
+    std::size_t country_beg = 8;
+    std::size_t country_end = id.find('/',   country_beg) - 1;          
+    std::size_t country_len = country_end - country_beg   + 1;
+    std::size_t isolate_beg = country_end                 + 2;
+    std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
+    std::size_t isolate_len = isolate_end - isolate_beg   + 1;
+
+}
+
 std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
 { 
     // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
@@ -643,6 +662,210 @@ std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
 
 }
 
+std::ifstream SplitCoVfasta::open_metadata() const
+{
+    // extract path of metadata file from the fasta file and add name metadata.tsv. Check if it exists.
+    std::filesystem::path metadata_fn = fasta.parent_path() / "metadata.tsv";
+    if (!std::filesystem::exists(metadata_fn))
+    {
+        seqan3::debug_stream << "Metadata file " << metadata_fn << " does not exist\n";
+        return std::ifstream{};
+    }
+    seqan3::debug_stream << "Reading metadata file " << metadata_fn << '\n';
+
+    // open the metadata file and return the ifstream
+    std::ifstream metadata_file{metadata_fn};
+    if (!metadata_file.is_open())
+    {
+        seqan3::debug_stream << "Could not open metadata file " << metadata_fn << '\n';
+    }
+    return metadata_file;
+}
+
+std::unordered_map<std::string, size_t> SplitCoVfasta::parse_metadata_header(std::ifstream& metadata_file)
+{   
+    // ----------------------------------------------------------------
+    // 1. Parse header line to identify column positions
+    // ----------------------------------------------------------------
+    std::unordered_map<std::string, size_t> col_index; 
+    std::string header_line;
+    if (!std::getline(metadata_file, header_line))
+    {
+        seqan3::debug_stream << "The metadata file is empty.\n";
+        return col_index;
+    }
+    if constexpr (debugging)
+        seqan3::debug_stream << "Header: " << header_line << '\n';
+
+    // Tokenize the header by tab. We'll store the index in a map keyed by column name.
+    // e.g., col might be "Virus name" or "Collection date", etc.
+
+    size_t current_idx = 0;
+    std::istringstream iss{header_line};
+    std::string col;
+    while (std::getline(iss, col, '\t'))
+        col_index[col] = current_idx++;
+    return col_index;
+}
+
+// read metadata
+void SplitCoVfasta::read_metadata()
+{
+    // Virus name	Last vaccinated	Passage details/history	Type	Accession ID	Collection date	Location	Additional location information	Sequence length	Host	Patient age	Gender	Clade	Pango lineage	Pango version	Variant	AA Substitutions	Submission date	Is reference?	Is complete?	Is high coverage?	Is low coverage?	N-Content	GC-Content
+    // hCoV-19/United Arab Emirates/BTC-4694/2021		Original	betacoronavirus	EPI_ISL_5142592	2021-01-31	Asia / United Arab Emirates / Abu Dhabi		29884	Human	51	Male	GRY	B.1.1.7	PANGO-v1.23	Former VOC Alpha GRY (B.1.1.7+Q.*) first detected in the UK	(Spike_H69del,NS3_L15F,NS8_Q27stop,NSP3_T183I,Spike_T716I,NSP6_S106del,N_R203K,Spike_A570D,NSP13_K460R,NSP4_F17L,Spike_N501Y,NSP3_I1412T,NS8_R52I,Spike_P681H,Spike_Y144del,NSP6_G107del,NSP3_A890D,Spike_D1118H,NSP6_F108del,NS8_Y73C,N_G204R,Spike_V70del,NSP12_P323L,Spike_D614G,N_D3L,Spike_S982A,N_S235F)	2021-10-14		True	True			0.379400348012
+    // hCoV-19/England/QEUH-2C8C50B/2021		Original	betacoronavirus	EPI_ISL_7299806	2021-11-30	Europe / United Kingdom / England		29764	Human	unknown	unknown	GK	AY.4	consensus call	Former VOC Delta GK (B.1.617.2+AY.*) first detected in India	(Spike_T29S,N_G215C,NSP3_A1711V,Spike_T95I,N_D63G,N_R203M,NSP12_G671S,Spike_G142D,NS3_S26L,Spike_P681R,Spike_R158del,NSP3_P1228L,Spike_Y170H,NS7a_V82A,NSP3_A488S,Spike_F157del,NSP4_T492I,NSP14_A394V,Spike_T19R,NS7a_T120I,N_D377Y,M_I82T,Spike_D950N,NSP15_T114A,NS7b_T40I,NSP2_S369F,NSP13_P77L,Spike_E156G,NSP3_P1469S,NSP5_R76K,Spike_T478K,NSP6_T77A,NSP12_P323L,Spike_D614G,Spike_L452R,NSP4_V167L)	2021-12-07		True	True			0.379430836945
+    // hCoV-19/USA/MI-CDC-STM-000048060/2021		Original	betacoronavirus	EPI_ISL_1691108	2021-03-31	North America / USA / Michigan	
+
+    auto metadata_file = open_metadata();
+    if (!metadata_file.is_open()) return;
+
+    auto col_index = parse_metadata_header(metadata_file);
+    if (col_index.empty()) return;
+
+    // For convenience, find column indexes (if they exist) once:
+    // We'll do lookups like col_index.find("Virus name"). 
+    // (some might not exist in older metadata versions)
+    auto idx_virusname_it  = col_index.find("Virus name");
+    auto idx_date_it       = col_index.find("Collection date");
+    auto idx_location_it   = col_index.find("Location");
+    auto idx_clade_it      = col_index.find("Clade");
+    auto idx_pango_it      = col_index.find("Pango lineage");
+    auto idx_pangover_it   = col_index.find("Pango version");
+
+    // Retrieve needed columns, if present:
+    // If not found, skip that field.
+
+    // ----------------------------------------------------------------
+    // 2. Prepare to parse lines in a memory-friendly manner
+    // ----------------------------------------------------------------
+    // We will parse them in-place, storing string_views that point into `line`.
+    std::string line;
+    line.reserve(4096);  // a guess; adjust if lines are large
+    std::vector<std::string_view> cols;
+    cols.reserve(64);    // typical # of columns (over-reserve to avoid repeated allocations)
+
+    // For 16M lines, we might want to disable sync with stdio for speed:
+    // (some do this at the start of main)
+    // std::ios::sync_with_stdio(false);
+    // std::cin.tie(nullptr);
+
+    size_t lines_parsed = 0;
+    while (std::getline(metadata_file, line))
+    {
+        ++lines_parsed;
+        if (line.empty()) continue;
+
+        // 2.1. Tokenize this line by tab into `cols` as string_views
+        cols.clear();
+        {
+            // We create views into `line` in-place
+            char * str_data = line.data();
+            size_t len      = line.size();
+            size_t start    = 0;
+
+            for (size_t i = 0; i < len; ++i)
+            {
+                if (line[i] == '\t')
+                {
+                    cols.emplace_back(str_data + start, i - start);
+                    start = i + 1;
+                }
+            }
+            // last column after final tab (or if no tabs at all)
+            if (start < len)
+                cols.emplace_back(str_data + start, len - start);
+        }
+
+        // We now have a vector of string_view columns. Let's extract the relevant fields.
+        if (idx_virusname_it->second >= cols.size())
+            continue; // skip if no column or no data - we need at least virus name, expected first field.
+
+        std::string_view virus_name_sv = cols[idx_virusname_it->second];
+        if (virus_name_sv.empty())
+            continue; // skip if no virus name
+
+        parsed_id& pid = metadata[std::string{virus_name_sv}]; // reference to the newly inserted parsed_id
+        // Create the parsed_id in-place in the map, keyed by virus_name (string)?
+        // We can do an emplace -> returns pair<iterator,bool>
+        // We'll fill the struct with brace initialization.
+        // auto [it, inserted] = metadata.try_emplace(std::string{virus_name_sv}, parsed_id{});
+        // if already in map, skip or overwrite? 
+        // Let’s assume we skip re-parsing if it’s already inserted:
+        if (!pid.isolate.empty()) continue;
+
+        // parse the isolate from the "virus name" 
+        pid.isolate = isolate(virus_name_sv); 
+
+        // 2.2. Parse Collection date -> pid.year, pid.month, pid.day
+        if (idx_date_it->second < cols.size())
+        {
+            std::string_view date_sv = cols[idx_date_it->second];
+            // e.g. "2021-03-31"
+            if (date_sv.size() >= 10)
+            {
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+                auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
+                auto fc3 = std::from_chars(d + 8, d + 10, pid.day  );  // parse day
+
+                // optional: check fc1.ec, fc2.ec, fc3.ec for parse errors
+            }
+        }
+
+        // 2.3. Parse Location -> pid.continent, pid.country, pid.region
+        if (idx_location_it->second < cols.size())
+        {
+            std::string_view loc_sv = cols[idx_location_it->second];
+
+            //     e.g. "North America / USA / Michigan"
+            // We'll do a split by '/' to get up to 3 parts
+
+            auto continent_end = loc_sv.find('/');
+            if (continent_end == std::string_view::npos)   
+                pid.continent = loc_sv;  // log an error? just set continent to the whole string
+            else
+            {
+                pid.continent = loc_sv.substr(0, continent_end - 1);
+                auto country_start = continent_end + 2;
+                if (country_start < loc_sv.size())  // there is a country
+                {  
+                    auto country_end   = loc_sv.find('/', country_start);
+                    if (country_end == std::string_view::npos) // log an error? just set country to the whole string
+                        pid.country = loc_sv.substr(country_start);
+                    else
+                    {
+                        pid.country = loc_sv.substr(country_start, country_end - 1 - country_start);
+                        auto region_start = country_end + 2;
+                        if (region_start < loc_sv.size())  // there is a region
+                        {  
+                            pid.region  = loc_sv.substr(region_start);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2.4. Clade
+        if ( idx_clade_it->second < cols.size())
+             pid.clade = cols[idx_clade_it->second];
+
+        // 2.5. Pango lineage
+        if (idx_pango_it->second < cols.size())
+            pid.pango = cols[idx_pango_it->second];
+
+        // 2.6. Pango version
+        if (idx_pangover_it->second < cols.size())
+            pid.pango_version  = cols[idx_pangover_it->second];
+    }
+
+    if constexpr (debugging)
+        seqan3::debug_stream << "[read_metadata] Parsed " << lines_parsed 
+                             << " lines. metadata.size()=" << metadata.size() << '\n';
+}
+
+void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
+{   
     // >hCoV-19/Wuhan/WIV04/2019|EPI_ISL_402124|2019-12-30|China
     // d_2019-12-30_x_1_c_China - Wuhan_EPI_02124_i_WIV04_p_E_Sarbeco_F2_Q_0_mm_0_N_0_crit_0_pat_......................
     // >hCoV-19/Sweden/6332562676/2022|EPI_ISL_16076002|2022-11-28|Europe
@@ -687,21 +910,35 @@ std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
 
 void SplitCoVfasta::split_fasta( )
 {
-    set_ref_pos();
+    set_ref_pos();        // load the reference, set MSA positions, etc.
+    read_metadata();      // fill metadata map keyed by Virus name
 
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
-    long t{0L}, m{(1L<<18)-1};
+    long t{0L}, m{(1L<<18)-1};  // for progress printing
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
 
     for (auto && record : file_in)             // read each sequence in the file
     {
-        // seqan3::debug_stream << "\n" << record.id() << '\n' ;
-        parsed_id pid;
-        parse_id(record.id(), pid);
+        if constexpr (debugging)
+            seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
+        std::string_view virus_name = record.id();
+        // if (format == GISAID_format::allnuc)
+        virus_name = virus_name.substr(0, virus_name.find('|'));
+
+        parsed_id& pid = metadata[std::string{virus_name}]; // reference to the newly inserted parsed_id
+        if (pid.isolate.empty())  // if isolate is not set, parse the id
+        {
+            if constexpr (debugging)
+                seqan3::debug_stream << "Not found in metadata. Gaing Parsing id: " << record.id() << '\n';
+            if (format == GISAID_format::allnuc)  // just for debbuging?
+                parse_id_allnuc(record.id(), pid);
+            else
+                parse_id(record.id(), pid);
+        }
 
         std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
         //for (auto & gene : genes)  // todo: parallelize (std::execution::par)
@@ -728,7 +965,7 @@ void SplitCoVfasta::split_fasta( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        //if (t>700000) break;
+        if (t>7) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 

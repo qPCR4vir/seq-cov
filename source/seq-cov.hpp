@@ -102,8 +102,16 @@ struct target_q
 };
 struct parsed_id
 {
-    std::string country, isolate, EPI_ISL;
-    int         year, month, day;
+    std::string country;      // 
+    std::string isolate;      // 
+    std::string EPI_ISL;      // 
+    int         year{0}, month{0}, day{0}; // 
+
+    std::string continent;
+    std::string region;
+    std::string clade;
+    std::string pango;
+    std::string pango_version;
 };
 
 using Metadata = std::unordered_map<std::string, parsed_id>;  // isolate -> metadata
@@ -201,6 +209,8 @@ class SplitCoVfasta
  private:
     std::vector<SplitGene> genes;
     Metadata               metadata;
+    std::ifstream          open_metadata() const;
+    std::unordered_map<std::string, size_t>  parse_metadata_header(std::ifstream &metadata_file);
     // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
     static std::string_view isolate(const std::string_view virus_name);
 
@@ -225,7 +235,11 @@ class SplitCoVfasta
                                msa_seq_t &msa_fragment, 
                              oligo_seq_t &reconstructed_seq,
                         long msa_beg, long msa_end, int tent_len = 0) ;
-    void parse_id(const std::string& id, parsed_id& pid);
+    void parse_id_allnuc(const std::string& id, parsed_id& pid);  // deprecated
+    void parse_id       (const std::string& id, parsed_id& pid);  // deprecated
+
+    void read_metadata();
+    
 };
 
 } // namespace cov
