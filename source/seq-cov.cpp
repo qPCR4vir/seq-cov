@@ -575,6 +575,15 @@ void SplitCoVfasta::set_ref_pos( )
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
     auto&& ref_rec = *file_in.begin();
+
+    // check if 'EPI_ISL_' is in the id
+    if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is allnuc format
+        format = GISAID_format::allnuc;
+
+    // if debuging print the format found
+    if constexpr (debugging) 
+        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::allnuc ? "allnuc" : "fasta") << '\n';        
+
     msa_ref = std::move(ref_rec.sequence());
     int msa_len = msa_ref.size();
 

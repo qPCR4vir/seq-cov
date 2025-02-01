@@ -106,6 +106,8 @@ struct parsed_id
     int         year, month, day;
 };
 
+using Metadata = std::unordered_map<std::string, parsed_id>;  // isolate -> metadata
+
 struct country_count
 {
     parsed_id   id;
@@ -132,7 +134,7 @@ struct target_count
     target_q target;
     int count = 0;
 };
-
+enum class GISAID_format {fasta, allnuc, allprot, allaa, allcodon, allnucprot, allnucaa, allnucprotcodon, allnucprotcodonaa};
 class SplitCoVfasta;
 struct SplitGene
 {
@@ -180,6 +182,7 @@ class SplitCoVfasta
 {
  public:
     std::filesystem::path fasta;
+    GISAID_format         format    {GISAID_format::fasta};
     std::filesystem::path dir       {fasta.parent_path()};
     std::string           fasta_name{fasta.filename().string()},
                           from, to;
@@ -194,8 +197,10 @@ class SplitCoVfasta
     oligo_seq_t           ref_seq;      
     std::vector<int>      msa_pos;
 
+
  private:
     std::vector<SplitGene> genes;
+    Metadata               metadata;
 
  public:
     SplitCoVfasta(const std::filesystem::path& fasta,
