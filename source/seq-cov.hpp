@@ -208,7 +208,7 @@ class SplitCoVfasta
     std::filesystem::path fasta;
     GISAID_format         format    {GISAID_format::fasta};
     std::filesystem::path dir       {fasta.parent_path()};
-    std::string           fasta_name{fasta.filename().string()},
+    std::string           fasta_name{fasta.stem().string()},
                           from, to;
     int                   flank{5},
                           crit_term_nt{4},

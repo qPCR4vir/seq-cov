@@ -625,17 +625,16 @@ bool SplitCoVfasta::extract_msa_seq(const msa_seq_t &full_msa_seq,
 void SplitCoVfasta::set_ref_pos( )
 {
     // Initialise a file input object with a FASTA file.
-    seqan3::sequence_file_input<MSA> file_in{fasta};
+    seqan3::sequence_file_input<OLIGO> file_in{dir / "MN908947.3.fasta"};
 
     auto&& ref_rec = *file_in.begin();
 
-    // check if 'EPI_ISL_' is in the id
-    if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is allnuc format
-        format = GISAID_format::allnuc;
+    ref_seq = std::move(ref_rec.sequence());
 
-    // if debuging print the format found
-    if constexpr (debugging) 
-        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::allnuc ? "allnuc" : "fasta") << '\n';        
+    seqan3::debug_stream << "\n\nReference: " << ref_rec.id() << ", reference lenth = " << ref_seq.size() << '\n';
+
+}
+
 void SplitCoVfasta::set_msa_ref_pos( )
 {
     // Initialise a file input object with a FASTA file.
@@ -711,7 +710,6 @@ std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
     return virus_name.substr(beg, end - beg); 
 
     // if the second '/' is found in the last position, beg will = size() and the result is an empty string_view
-
 }
 
 std::ifstream SplitCoVfasta::open_metadata() const
