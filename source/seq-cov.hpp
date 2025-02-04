@@ -12,7 +12,15 @@
 #include <seqan3/core/debug_stream.hpp>         // for debug_stream
 //#include <seqan3/alignment/decorator/gap_decorator.hpp>
 
-constexpr bool debugging = true;  
+enum {  debugging_NOT_USED= 0, 
+        debugging_NO_DEBUG= 1, 
+        debugging_ERROR   = 10, 
+        debugging_WARNING = 20, 
+        debugging_INFO    = 30, 
+        debugging_VERBOSE = 35,
+        debugging_DEBUG   = 40, 
+        debugging_TRACE   = 80};
+constexpr auto debugging = debugging_TRACE;  // How much debug info to print
 // todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
 
 

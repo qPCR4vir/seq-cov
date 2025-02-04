@@ -59,7 +59,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 {
         if (path_oligos.empty()) return false;   // todo: more checks?
 
-        if constexpr (debugging) 
+        if constexpr (debugging >= debugging_INFO) 
         {  seqan3::debug_stream << "\nGoing to load: " << path_oligos.string(); }
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
@@ -74,7 +74,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         for (auto & primer : file_in)
         {
             std::string id = std::move(primer.id());
-            if constexpr (debugging) 
+            if constexpr (debugging >= debugging_VERBOSE) 
                 seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
             // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
@@ -178,6 +178,11 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
     seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                         << pq.primer.seq <<" - oligo seq\n" 
                         << oligo_target << " - target seq\n" ;
+{
+    if constexpr (debugging >= debugging_TRACE) 
+        seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                            << pq.primer.seq <<" - oligo seq\n" 
+                            << oligo_target  <<" - target seq\n" ;
 
     auto output_config = seqan3::align_cfg::output_score{}          | 
                          seqan3::align_cfg::output_begin_position{} |
@@ -188,47 +193,49 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                                                     seqan3::mismatch_score{-1}}};
     /*seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, 
                                                     seqan3::align_cfg::extension_score{-1}};*/
+
     auto config = method |  scheme |output_config; // gap_costs |
-    if constexpr (debugging) 
+    if constexpr (debugging >= debugging_TRACE) 
                 seqan3::debug_stream << "\nTarget: " << oligo_target << "\nPrimer: " << pq.primer.seq << '\n';
 
-    if constexpr (debugging) 
+    if constexpr (debugging >= debugging_TRACE) 
                 seqan3::debug_stream << " Going to check results\n";     
 
-    for (auto const & res : seqan3::align_pairwise(std::tie(oligo_target, pq.primer.seq), config))
+    for (auto const & res : seqan3::align_pairwise(std::tie(oligo_target,  // sequence1 = target
+                                                            pq.primer.seq  // sequence2 = primer
+                                                            ), config))
     //auto results = seqan3::align_pairwise(std::tie(target, pq.primer.seq), config);
-
     //for (auto & res : results)
     // if (res.score() > pq.primer.match)  // primer found. 
     {
-        if constexpr (debugging) 
+        if constexpr (debugging >= debugging_TRACE) 
                 seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
-        if constexpr (debugging) 
+        if constexpr (debugging >= debugging_TRACE) 
                 seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-        if constexpr (debugging) 
+        if constexpr (debugging >= debugging_TRACE) 
                 seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
     
-            //brief Helper function to print elements of a tuple separately.
-            auto&[a_t, a_p] = res.alignment();
+            //brief Helper function to print elements of a tuple separately: aligned_target, aligned_primer
+            auto&[aligned_target, aligned_primer] = res.alignment();
             pq.pattern.clear();
             
-            int len_a_pr = a_p.size();
-            int len_a_tg = a_t.size(); 
+            int len_a_pr = aligned_primer.size();
+            int len_a_tg = aligned_target.size(); 
             int len = std::max(len_a_pr, len_a_tg);
 
-            if constexpr (debugging) 
-                seqan3::debug_stream << " cont...\n" ;
-            int o_p = res.sequence2_begin_position();
+            if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << " cont...\n" ;
+
+            int o_p = res.sequence2_begin_position();  // add needed '-' to the pattern before aligned region ??
             if (o_p) pq.pattern = std::string(o_p, '-');
 
-            for (int i = 0; i < len; ++i)
+            for (int i = 0; i < len; ++i)  // go through the aligned region, len = std::max(len_a_pr, len_a_tg)
             {
                 if (i >= len_a_pr)  // extra nt in aligned target ?? ignore ?
                 {
                     if (o_p >= pq.primer.len) continue  ;  // ??
                     o_p++;
-                    pq.pattern.push_back(a_t[i].to_char());   
-                    if  (a_t[i] == 'N'_dna15)  
+                    pq.pattern.push_back(aligned_target[i].to_char());   
+                    if  (aligned_target[i] == 'N'_dna15)  
                     {
                         pq.N++;
                         continue;
@@ -246,18 +253,18 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                     if (o_p >= pq.primer.len - parent.crit_term_nt)                   pq.crit++;
                     continue;
                 }
-                if (a_p[i].holds_alternative<seqan3::gap>() &&
-                    a_t[i].holds_alternative<seqan3::gap>()    )       continue;  // ??
+                if (aligned_primer[i].holds_alternative<seqan3::gap>() &&
+                    aligned_target[i].holds_alternative<seqan3::gap>()    )       continue;  // ??
 
-                if (a_t[i].holds_alternative<seqan3::gap>()    )     // deletion in target (or insertion in ref?)
+                if (aligned_target[i].holds_alternative<seqan3::gap>()    )     // deletion in target (or insertion in ref?)
                 {
                     if (o_p >= pq.primer.len) continue  ;  // ??
                     o_p++;
                     pq.pattern.push_back('-');  
                     continue;
                 }
-                auto t = a_t[i].convert_unsafely_to<oligo_seq_alph>();        
-                if (a_p[i].holds_alternative<seqan3::gap>())  // insertion in target 
+                auto t = aligned_target[i].convert_unsafely_to<oligo_seq_alph>();        
+                if (aligned_primer[i].holds_alternative<seqan3::gap>())  // insertion in target 
                 {
                     if (!o_p) continue;  // ignore insertions before primer
                     // assume ???? that the inserted base is not in the primer
@@ -266,7 +273,7 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                     if (pq.primer.len - o_p <= parent.crit_term_nt)                   pq.crit++;  // ??
                     continue;
                 }
-                auto p = a_p[i].convert_unsafely_to<oligo_seq_alph>();   
+                auto p = aligned_primer[i].convert_unsafely_to<oligo_seq_alph>();   
                 o_p++;
                 if (!mismatch.score(t, p))     
                 { 
@@ -287,14 +294,17 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                 pq.Q = pq.mm + pq.crit * 4;  // primer found. 
             else pq.Q = 1000;
 
-            seqan3::debug_stream << a_p        << " - aligned oligo\n"
-                                 << pq.pattern << " - pattern\n"
-                                 << a_t        << " - aligned target\n" ;
+            if constexpr (debugging >= debugging_TRACE)
+            seqan3::debug_stream << aligned_primer        << " - aligned oligo\n"
+                                 << pq.pattern            << " - pattern\n"
+                                 << aligned_target        << " - aligned target\n" ;
             return;
     }
     pq.Q = 1000;
     auto tostring = oligo_target | seqan3::views::to_char;
     pq.pattern = std::string{tostring.begin(), tostring.end()};
+
+    if constexpr (debugging >= debugging_TRACE)
     seqan3::debug_stream << pq.primer.seq << " - unaligned oligo\n"
                          << pq.pattern    << " - unaligned pattern\n"
                          << oligo_target  << " - unaligned target\n" ;
