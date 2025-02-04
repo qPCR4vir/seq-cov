@@ -776,6 +776,7 @@ void SplitCoVfasta::read_metadata()
     // We'll do lookups like col_index.find("Virus name"). 
     // (some might not exist in older metadata versions)
     auto idx_virusname_it  = col_index.find("Virus name");
+    auto idx_EPI_ISL_it    = col_index.find("Accession ID");
     auto idx_date_it       = col_index.find("Collection date");
     auto idx_location_it   = col_index.find("Location");
     auto idx_clade_it      = col_index.find("Clade");
@@ -851,7 +852,7 @@ void SplitCoVfasta::read_metadata()
         {
             std::string_view date_sv = cols[idx_date_it->second];
             // e.g. "2021-03-31"
-            if (date_sv.size() >= 10)
+            if (date_sv.size() == 10)
             {
                 auto d = date_sv.data();
               
@@ -860,6 +861,26 @@ void SplitCoVfasta::read_metadata()
                 auto fc3 = std::from_chars(d + 8, d + 10, pid.day  );  // parse day
 
                 // optional: check fc1.ec, fc2.ec, fc3.ec for parse errors
+            }
+            else  // log debug, and try using chrono to parse the date
+            {
+                seqan3::debug_stream << "ERROR: [read_metadata] Unexpected date format: " << date_sv << '\n';
+
+                // std::chrono::year_month_day ymd;
+                // // try to parse the date using chrono    from_stream 
+                // try
+                // {
+                //     std::istringstream ss{std::string{date_sv}};
+                //     std::chrono::from_stream(ss, "%F", ymd);  // no from_stream available in gcc C++20 ??
+                //     pid.year  = static_cast<int     >(ymd.year ());
+                //     pid.month = static_cast<unsigned>(ymd.month());
+                //     pid.day   = static_cast<unsigned>(ymd.day  ());
+                //     seqan3::debug_stream << "[read_metadata] Parsed date using chrono: " << pid.year << '-' << pid.month << '-' << pid.day << '\n';
+                // }
+                // catch (const std::exception& e)
+                // {
+                //     seqan3::debug_stream << "[read_metadata] Failed to parse date using chrono: " << e.what() << '\n';
+                // }
             }
         }
 
@@ -907,6 +928,10 @@ void SplitCoVfasta::read_metadata()
         // 2.6. Pango version
         if (idx_pangover_it->second < cols.size())
             pid.pango_version  = cols[idx_pangover_it->second];
+
+        // 2.7. EPI_ISL
+        if (idx_EPI_ISL_it->second < cols.size())
+            pid.EPI_ISL = cols[idx_EPI_ISL_it->second];
     }
 
     if constexpr (debugging)
