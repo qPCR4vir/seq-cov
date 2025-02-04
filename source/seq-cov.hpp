@@ -198,7 +198,8 @@ struct SplitGene
 
     bool reconstruct_msa_seq(const msa_seq_t &s, oligo_seq_t &seq,
                          long msa_beg, long msa_end, int tent_len);
-    void write_msa_grouped ();
+    void write_msa_grouped();
+    void write_grouped();
 };    
 
 

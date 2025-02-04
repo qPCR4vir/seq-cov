@@ -482,6 +482,109 @@ target_count& SplitGene::check_rec(auto& record)
     return target_c;   
 }
 
+void build_patterns(target_count & parent, std::string & patterns)
+{
+        patterns.clear();              
+        
+        // discard sequences with too many N.
+        if (std::all_of(parent.target.patterns.begin(), parent.target.patterns.end(), 
+                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
+            return;
+
+        for (auto& pq : parent.target.patterns)
+        {
+            patterns += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
+                            pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
+        }
+        patterns += "|" + parent.target.target_pattern + "|" ;  // at the end we will add the count    
+}
+
+void SplitGene::write_grouped ()
+{
+    using types    = seqan3::type_list<oligo_seq_t, std::string>;
+    using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
+    using record_t = seqan3::sequence_record<types, fields>;
+    using sgr_t    = decltype(grouped)::value_type;  // std::unordered_map<oligo_seq_t, target_count>;
+    using sgr_p    = sgr_t*;
+    using fasta_out= seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >;
+
+       auto name = parent.fasta_name + "." + gene;
+
+       std::filesystem::path gr  = parent.dir / (name + ".grouped.fasta" );
+
+       std::filesystem::path grm    = parent.dir / (name + ".monthly.fasta" );
+       //std::filesystem::path grmc   = parent.dir / (name + ".monthly-continent.fasta" );
+       //std::filesystem::path grmcc  = parent.dir / (name + ".monthly-continent-country.fasta" );
+       //std::filesystem::path grmccc = parent.dir / (name + ".monthly-continent-country-clade.fasta" );
+
+       std::filesystem::path grd    = parent.dir / (name + ".daily.fasta"   );
+       std::filesystem::path grdc   = parent.dir / (name + ".daily-continent.fasta" );
+       std::filesystem::path grdcc  = parent.dir / (name + ".daily-continent-country.fasta" );
+       std::filesystem::path grdccc = parent.dir / (name + ".daily-continent-country-clade.fasta" );
+
+    seqan3::debug_stream << "Going to write: " << grdccc << "\n" ;
+    fasta_out  file_e_gr  {gr  },  
+               file_e_grm {grm }; //, file_e_grmc {grmc}, file_e_grmcc{grmcc}, file_e_grmccc{grmccc};
+    fasta_out  file_e_grd {grd }, file_e_grdc {grdc}, file_e_grdcc{grdcc}, file_e_grdccc{grdccc};
+    
+    std::vector<sgr_p> gr_v;
+    gr_v.reserve(grouped.size());
+    for (sgr_t& sgr : grouped) gr_v.push_back(&sgr);  // vector of pointers to msa_grouped target_count sequences
+
+    std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)    {return a->second.count > b->second.count;});
+
+    std::string patterns, id;
+    patterns.reserve(4000);
+    id.reserve(4000);
+
+    for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
+    {
+        target_count & parent = sg->second;
+        build_patterns(parent, patterns);
+        if (patterns.empty()) continue;
+
+        for (auto& [year,      yc]:  sg->second.years) 
+        for (auto& [month,     mc]:  yc.months       ) {
+        for (auto& [day,       dc]:  mc.days         ) {
+        for (auto& [continent, ct]:  dc.continents   ) {
+        for (auto& [country,   cc]:  ct.countries    )   
+        {    
+            for (auto& [clade, cl]:  cc.clades       ) 
+            {
+                auto & pid = *cl.id;
+
+                id = std::format(
+                    "|{} |{:04d}-{:02d}-{:02d}|{}|{}|{}|{}|{}|{}|{}",
+                    pid.EPI_ISL, 
+                    year, month, day,
+                    pid.isolate, 
+                    pid.continent,   // or combine them 
+                    pid.country,
+                    pid.region,
+                    pid.clade,
+                    pid.pango,
+                    pid.pango_version    ) + patterns;
+
+                // output to ".daily-continent-country-clade" file_e_grdccc
+                file_e_grdccc.push_back<record_t>( record_t{sg->first, std::to_string(cl.count) + id} );
+            }
+            // output to ".daily-continent-country" file_e_grdcc
+            file_e_grdcc.push_back<record_t>( record_t{sg->first, std::to_string(cc.count) + id} );
+        }
+        // output to ".daily-continent" file_e_grdc
+        file_e_grdc.push_back<record_t>( record_t{sg->first, std::to_string(ct.count) + id} );
+        }
+        // output to ".daily" file_e_grd
+        file_e_grd.push_back<record_t>( record_t{sg->first, std::to_string(dc.count) + id} );
+        }
+        // output to ".monthly" file_e_grm
+        file_e_grm.push_back<record_t>( record_t{sg->first, std::to_string(mc.count) + id} );
+        }
+        // output to ".grouped" file_e_gr
+        file_e_gr.push_back<record_t>( record_t{sg->first, std::to_string(sg->second.count) + id} );
+    }
+}
+
 void SplitGene::write_msa_grouped ()
 {
     using types    = seqan3::type_list<msa_seq_t, std::string>;
@@ -522,18 +625,9 @@ void SplitGene::write_msa_grouped ()
 
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
-        // discard sequences with too many N.
-        if (std::all_of(sg->second.target.patterns.begin(), sg->second.target.patterns.end(), 
-                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
-            continue;
-
-        patterns.clear();  
-        for (auto& pq : sg->second.target.patterns)
-        {
-            patterns += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
-                            pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
-        }
-        patterns += "|" + sg->second.target.target_pattern + "|" ;  // at the end we will add the count    
+        target_count & parent = sg->second;
+        build_patterns(parent, patterns);
+        if (patterns.empty()) continue;
 
         for (auto& [year,      yc]:  sg->second.years) 
         for (auto& [month,     mc]:  yc.months       ) {
