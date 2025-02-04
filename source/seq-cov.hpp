@@ -246,6 +246,9 @@ class SplitCoVfasta
     }
 
     GISAID_format check_format();
+    void split();
+private:
+    void update_target_count(target_count& tc, const parsed_id& pid);
     void split_msa( );
     void split_fasta( );
     void set_ref_pos();

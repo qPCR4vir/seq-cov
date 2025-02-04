@@ -622,7 +622,7 @@ bool SplitCoVfasta::extract_msa_seq(const msa_seq_t &full_msa_seq,
     return true;
 }
 
-void SplitCoVfasta::set_ref_pos( )
+void SplitCoVfasta::set_ref_pos( )  // set reference sequence , todo: set positions of primers?
 {
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<OLIGO> file_in{dir / "MN908947.3.fasta"};
@@ -1003,15 +1003,72 @@ GISAID_format SplitCoVfasta::check_format()
         seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';        
 }
 
-void SplitCoVfasta::split_fasta( )
-{}
-
-void SplitCoVfasta::split_msa( )
+void SplitCoVfasta::split( )
 {
     check_format();
     read_metadata();      // fill metadata map keyed by Virus name
-    if (format == GISAID_format::fasta) return split_fasta();
+    if (format == GISAID_format::fasta) 
+        return split_fasta();
+    return split_msa();
+}
 
+void SplitCoVfasta::split_fasta( )
+{
+    set_ref_pos();    // load the reference sequence
+ 
+    // Initialise a file input object with a FASTA file.
+    seqan3::sequence_file_input<OLIGO> file_in{fasta};
+
+    long t{0L}, m{(1L<<18)-1};  // for progress printing
+    seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
+
+    for (auto && record : file_in)             // read each sequence in the file
+    {
+        if constexpr (debugging)
+            seqan3::debug_stream << "\n" << record.id() << '\n' ;
+
+        std::string_view virus_name = record.id();
+        virus_name = virus_name.substr(0, virus_name.find('|'));
+
+        parsed_id& pid = metadata[std::string{virus_name}]; // reference to the newly inserted parsed_id
+        if (pid.isolate.empty())  // if isolate is not set, parse the id
+        {
+            if constexpr (debugging)
+                seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
+            parse_id(record.id(), pid);
+        }
+
+        //for (auto & gene : genes)  
+        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        {
+            target_count& tc = gene.check_rec(record);
+            update_target_count(tc, pid);
+        });
+
+        if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
+        {
+            // seqan3::debug_stream << '.' ;
+        
+            seqan3::debug_stream << "\tT= " << t  << "\n" ;
+            for (auto & gene : genes)
+                seqan3::debug_stream << gene.gene <<"= " << gene.count 
+                                     << ". Grouped: "    << gene.grouped.size() << "\n" ; 
+        }
+        if (t>7000) break;
+    }
+    seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
+
+    for (auto & gene : genes)                // write grouped sequences for each gene/target
+    {
+        seqan3::debug_stream << gene.gene <<"= " << gene.count 
+                             << ". Grouped: "    << gene.grouped.size() << ". " ; 
+        gene.write_grouped();
+    }
+
+}
+
+void SplitCoVfasta::split_msa( )
+{
     set_msa_ref_pos();    // load the reference, set MSA positions, etc.
  
     // Initialise a file input object with a FASTA file.
@@ -1027,7 +1084,6 @@ void SplitCoVfasta::split_msa( )
             seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
         std::string_view virus_name = record.id();
-        // if (format == GISAID_format::msa)
         virus_name = virus_name.substr(0, virus_name.find('|'));
 
         parsed_id& pid = metadata[std::string{virus_name}]; // reference to the newly inserted parsed_id
@@ -1035,38 +1091,15 @@ void SplitCoVfasta::split_msa( )
         {
             if constexpr (debugging)
                 seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
-            if (format == GISAID_format::msa)  // just for debbuging?
-                parse_id_allnuc(record.id(), pid);
-            else
-                parse_id(record.id(), pid);
+            parse_id_allnuc(record.id(), pid);
         }
 
+        //for (auto & gene : genes)   
         std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
-        //for (auto & gene : genes)  // todo: parallelize (std::execution::par)
         {
             target_count& tc = gene.check_rec(record);
-            
-            year_count& yc = tc.years[pid.year];
-            yc.count++;
-            
-            month_count& mc = yc.months[pid.month];
-            mc.count++;
-            
-            day_count& dc = mc.days[pid.day];
-            dc.count++;
-                        
-            continent_count& ct = dc.continents[pid.continent];
-            ct.count++;
-
-            country_count& cc = ct.countries[pid.country];
-            cc.count++;
-
-            clade_count& cd = cc.clades[pid.clade];
-            cd.count++;            
-            if (!cd.id) cd.id = &pid;
-
-        }//
-        );
+            update_target_count(tc, pid);
+        });
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
         {
@@ -1077,7 +1110,7 @@ void SplitCoVfasta::split_msa( )
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.msa_grouped.size() << "\n" ; 
         }
-        if (t>7) break;
+        if (t>7000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
@@ -1088,6 +1121,28 @@ void SplitCoVfasta::split_msa( )
         gene.write_msa_grouped();
     }
 
+}
+
+void SplitCoVfasta::update_target_count(target_count& tc, const parsed_id& pid)
+{
+    year_count& yc = tc.years[pid.year];
+    yc.count++;
+    
+    month_count& mc = yc.months[pid.month];
+    mc.count++;
+    
+    day_count& dc = mc.days[pid.day];
+    dc.count++;
+                
+    continent_count& ct = dc.continents[pid.continent];
+    ct.count++;
+
+    country_count& cc = ct.countries[pid.country];
+    cc.count++;
+
+    clade_count& cd = cc.clades[pid.clade];
+    cd.count++;            
+    if (!cd.id) cd.id = &pid;
 }
 
 }  // namespace cov
