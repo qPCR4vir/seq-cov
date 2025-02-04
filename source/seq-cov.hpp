@@ -115,15 +115,24 @@ struct parsed_id
 };
 
 using Metadata = std::unordered_map<std::string, parsed_id>;  // isolate -> metadata
-
+struct clade_count
+{
+    parsed_id   *id = nullptr;  // pointer to Metadata parsed_id in SplitCoVfasta::metadata
+    int         count = 0;
+};
 struct country_count
 {
-    parsed_id   id;
+    std::unordered_map<std::string, clade_count> clades;
+    int         count = 0;
+};
+struct continent_count
+{
+    std::unordered_map<std::string, country_count> countries;
     int         count = 0;
 };
 struct day_count
 {
-    std::unordered_map<std::string, country_count> countries;
+    std::unordered_map<std::string, continent_count> continents;
     int         count = 0;
 };
 struct month_count
