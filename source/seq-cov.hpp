@@ -165,11 +165,11 @@ struct SplitGene
 {
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; // hamming distance is default
 
-    SplitCoVfasta  &parent;
+    SplitCoVfasta      &parent;
     const std::string   gene;
     std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
     std::vector<oligo>  all_oligos;
-    int                 forw_idx{}, rev_idx{};    
+    int                 extern_forw_idx{}, extern_rev_idx{};    
 
     long          ref_beg{0}, ref_end{0},  // amplicon positions in the reference sequence
                   msa_beg{0}, msa_end{0};  // amplicon positions in the MSA

@@ -8,6 +8,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <execution>
+#include <chrono>
 
 	
 // #include <seqan3/std/ranges>                    // include all of the standard library's views
@@ -63,12 +64,13 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         {  seqan3::debug_stream << "\nGoing to load: " << path_oligos.string(); }
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
-        ref_beg = ref_end = 0;
+        ref_beg = std::numeric_limits<long>::max();
+        ref_end = std::numeric_limits<long>::min();
         f_primers.clear();
         r_primers.clear();
         probes_s.clear();
         probes_a.clear();
-        int forw_idx{0}, rev_idx{0};
+        //extern_forw_idx = extern_rev_idx = -1;
         all_oligos.clear();
 
         for (auto & primer : file_in)
@@ -77,7 +79,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             if constexpr (debugging >= debugging_VERBOSE) 
                 seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
-            // parse beg, end from id = >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
+            // parse beg, end from id:   >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
             oligo pr;
             std::stringstream ss{id};
             ss >> pr.name >> pr.code ;
@@ -94,6 +96,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             if constexpr (debugging) 
                 seqan3::debug_stream << " with minimum matches:" << pr.match;
 
+            // update this gene-amplicon
             if (pr.ref_beg < pr.ref_end)   
             {
                 pr.reverse = false;
@@ -104,10 +107,10 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
                     " instead of " + std::to_string(pr.ref_end - pr.ref_beg + 1) + " at position " + std::to_string(pr.ref_beg) 
                     + " to " + std::to_string(pr.ref_end)};
 
-                if ( !ref_beg || ref_beg > pr.ref_beg)  // extern forward primer
+                if ( ref_beg > pr.ref_beg)  // current extern forward primer
                 {
                     ref_beg = pr.ref_beg;
-                    forw_idx = f_primers.size();
+                    extern_forw_idx = f_primers.size();
                 }   
                 f_primers.push_back(pr);   
                 all_oligos.push_back(pr);                  
@@ -123,10 +126,10 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
                     " instead of " + std::to_string(pr.ref_beg - pr.ref_end + 1) + " at position " + std::to_string(pr.ref_beg) 
                     + " to " + std::to_string(pr.ref_end)};
 
-                if ( !ref_end || ref_end < pr.ref_beg)  // extern reverse primer
+                if (ref_end < pr.ref_beg)  // extern reverse primer
                 {
                     ref_end = pr.ref_beg;
-                    rev_idx = r_primers.size();
+                    extern_rev_idx = r_primers.size();
                 }
                 r_primers.push_back(pr);
                 all_oligos.push_back(pr);    
@@ -134,6 +137,8 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
             }
         }
         ref_len = ref_end - ref_beg + 1;
+        if (ref_len < 40) 
+            throw std::runtime_error{"Amplicon length is too short: " + std::to_string(ref_len)};
 
         /*for (auto & primer : f_primers) all_oligos.push_back(&primer);
         for (auto & primer : r_primers) all_oligos.push_back(&primer);
