@@ -143,7 +143,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         return true;
 }
 
-bool SplitGene::reconstruct_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
+bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
     if constexpr (debugging) 
                 seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
@@ -310,13 +310,13 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)
                          << oligo_target  << " - unaligned target\n" ;
 }
 
-void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
+void SplitGene::align_to_msa(pattern_q &pq,               ///< oligo_pattern_quality    // align_to_msa - not used !!
                     const msa_seq_t &full_target)
 {
     oligo_seq_t oligo_target;
     msa_seq_t   msa_fragment;
     cov::oligo &primer = pq.primer;
-    parent.extract_seq(full_target, msa_fragment, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
+    parent.extract_msa_seq(full_target, msa_fragment, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
 
     pq.pattern.clear();
     pq.pattern.reserve(primer.seq.size()+1);
@@ -376,6 +376,7 @@ void SplitGene::align(pattern_q &pq,  ///< oligo_pattern_quality
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  
 }
+
 void SplitGene::target_pattern(target_q & tq, const msa_seq_t& full_target)
 {
     tq.target_pattern.clear();
@@ -434,7 +435,7 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_targ
 {
     cov::oligo &primer = pq.primer;
     oligo_seq_t oligo_target;
-    reconstruct_seq(full_target, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
+    reconstruct_msa_seq(full_target, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
     if (oligo_target.size() != primer.len)
         //return align(pq, full_target); // todo: try to align the primer with the oligo_target sequence
         return re_align(pq, oligo_target); // todo: try to align the primer with the oligo_target sequence
@@ -468,7 +469,7 @@ target_count& SplitGene::check_rec(auto& record)
     msa_seq_t& full_target = record.sequence();
     count++;
 
-    target_count & target_c = grouped[{full_target.begin()+msa_beg, full_target.begin()+msa_end}]; 
+    target_count & target_c = msa_grouped[{full_target.begin()+msa_beg, full_target.begin()+msa_end}]; 
     if (!target_c.count)  // new target sequence
         evaluate_target(target_c.target, full_target);
     
@@ -476,12 +477,12 @@ target_count& SplitGene::check_rec(auto& record)
     return target_c;   
 }
 
-void SplitGene::write_grouped ()
+void SplitGene::write_msa_grouped ()
 {
     using types    = seqan3::type_list<msa_seq_t, std::string>;
     using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
     using record_t = seqan3::sequence_record<types, fields>;
-    using sgr_t    = decltype(grouped)::value_type;  // std::unordered_map<msa_seq_t, target_count>;
+    using sgr_t    = decltype(msa_grouped)::value_type;  // std::unordered_map<msa_seq_t, target_count>;
     using sgr_p    = sgr_t*;
     using fasta_out= seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >;
 
@@ -505,8 +506,8 @@ void SplitGene::write_grouped ()
     fasta_out  file_e_grd {grd }, file_e_grdc {grdc}, file_e_grdcc{grdcc}, file_e_grdccc{grdccc};
     
     std::vector<sgr_p> gr_v;
-    gr_v.reserve(grouped.size());
-    for (sgr_t& sgr : grouped) gr_v.push_back(&sgr);  // vector of pointers to grouped target_count sequences
+    gr_v.reserve(msa_grouped.size());
+    for (sgr_t& sgr : msa_grouped) gr_v.push_back(&sgr);  // vector of pointers to msa_grouped target_count sequences
 
     std::sort(gr_v.begin(), gr_v.end(), []( sgr_p &a,  sgr_p &b)    {return a->second.count > b->second.count;});
 
@@ -573,7 +574,7 @@ void SplitGene::write_grouped ()
 
 // class SplitCoVfasta
 
-bool SplitCoVfasta::extract_seq(const msa_seq_t &full_msa_seq, 
+bool SplitCoVfasta::extract_msa_seq(const msa_seq_t &full_msa_seq, 
                                           msa_seq_t &msa_fragment, 
                                         oligo_seq_t &reconstructed_seq,
                         long msa_beg, long msa_end, int tent_len )  // = 0
@@ -630,6 +631,12 @@ void SplitCoVfasta::set_ref_pos( )
     // if debuging print the format found
     if constexpr (debugging) 
         seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::allnuc ? "allnuc" : "fasta") << '\n';        
+void SplitCoVfasta::set_msa_ref_pos( )
+{
+    // Initialise a file input object with a FASTA file.
+    seqan3::sequence_file_input<MSA> file_in{fasta};
+
+    auto&& ref_rec = *file_in.begin();
 
     msa_ref = std::move(ref_rec.sequence());
     int msa_len = msa_ref.size();
@@ -648,7 +655,7 @@ void SplitCoVfasta::set_ref_pos( )
 
     seqan3::debug_stream << "\n\nMSA Reference: " << ref_rec.id() << ",\t MSA lenth = " << msa_len << ", reference lenth = " << ref_seq.size() << '\n';
     
-    // for (auto & gene : genes) gene.set_ref_pos(); Set/Check correct positions of primers on the reference sequence
+    // for (auto & gene : genes) gene.set_msa_ref_pos(); Set/Check correct positions of primers on the reference sequence
     for (auto & gene : genes) 
     {
         // set gene target positions, First check ref_beg and ref_end were alrready set (in read_oligos)
@@ -666,7 +673,7 @@ void SplitCoVfasta::set_ref_pos( )
             primer.msa_beg = msa_pos[primer.ref_beg-1];
             primer.msa_end = msa_pos[primer.ref_end-1];
             primer.msa_len = primer.msa_end - primer.msa_beg + 1;
-            extract_seq(msa_ref, primer.msa_ref, primer.ref_seq, primer.msa_beg, primer.msa_end, primer.seq.size());
+            extract_msa_seq(msa_ref, primer.msa_ref, primer.ref_seq, primer.msa_beg, primer.msa_end, primer.seq.size());
         }
 
     }
@@ -749,6 +756,9 @@ std::unordered_map<std::string, size_t> SplitCoVfasta::parse_metadata_header(std
 }
 
 // read metadata
+// GISAID seems to be changing the publication format of the main source of sequences.
+// Aparentely, there are no big alignment files, only fasta files and metadata files.
+// We will need to parse both and keep the info in sync.
 void SplitCoVfasta::read_metadata()
 {
     // Virus name	Last vaccinated	Passage details/history	Type	Accession ID	Collection date	Location	Additional location information	Sequence length	Host	Patient age	Gender	Clade	Pango lineage	Pango version	Variant	AA Substitutions	Submission date	Is reference?	Is complete?	Is high coverage?	Is low coverage?	N-Content	GC-Content
@@ -948,11 +958,34 @@ void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
 
 }
 
-void SplitCoVfasta::split_fasta( )
+// check format by reading and checking the first record
+GISAID_format SplitCoVfasta::check_format()
 {
-    set_ref_pos();        // load the reference, set MSA positions, etc.
-    read_metadata();      // fill metadata map keyed by Virus name
+    // Initialise a file input object with the fasta file.
+    seqan3::sequence_file_input<MSA> file_in{fasta};
 
+    auto&& ref_rec = *file_in.begin();
+    if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is msa format
+        format = GISAID_format::msa;
+    else
+        format = GISAID_format::fasta;
+
+    // if debuging print the format found
+    if constexpr (debugging) 
+        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';        
+}
+
+void SplitCoVfasta::split_fasta( )
+{}
+
+void SplitCoVfasta::split_msa( )
+{
+    check_format();
+    read_metadata();      // fill metadata map keyed by Virus name
+    if (format == GISAID_format::fasta) return split_fasta();
+
+    set_msa_ref_pos();    // load the reference, set MSA positions, etc.
+ 
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
@@ -966,15 +999,15 @@ void SplitCoVfasta::split_fasta( )
             seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
         std::string_view virus_name = record.id();
-        // if (format == GISAID_format::allnuc)
+        // if (format == GISAID_format::msa)
         virus_name = virus_name.substr(0, virus_name.find('|'));
 
         parsed_id& pid = metadata[std::string{virus_name}]; // reference to the newly inserted parsed_id
         if (pid.isolate.empty())  // if isolate is not set, parse the id
         {
             if constexpr (debugging)
-                seqan3::debug_stream << "Not found in metadata. Gaing Parsing id: " << record.id() << '\n';
-            if (format == GISAID_format::allnuc)  // just for debbuging?
+                seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
+            if (format == GISAID_format::msa)  // just for debbuging?
                 parse_id_allnuc(record.id(), pid);
             else
                 parse_id(record.id(), pid);
@@ -1014,7 +1047,7 @@ void SplitCoVfasta::split_fasta( )
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
             for (auto & gene : genes)
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                     << ". Grouped: "    << gene.grouped.size() << "\n" ; 
+                                     << ". Grouped: "    << gene.msa_grouped.size() << "\n" ; 
         }
         if (t>7) break;
     }
@@ -1023,8 +1056,8 @@ void SplitCoVfasta::split_fasta( )
     for (auto & gene : genes)                // write grouped sequences for each gene/target
     {
         seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                             << ". Grouped: "    << gene.grouped.size() << ". " ; 
-        gene.write_grouped();
+                             << ". Grouped: "    << gene.msa_grouped.size() << ". " ; 
+        gene.write_msa_grouped();
     }
 
 }

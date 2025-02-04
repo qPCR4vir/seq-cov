@@ -58,7 +58,7 @@ GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
             }           
         try
         {
-            sp.split_fasta();
+            sp.split_msa();
         }
         catch (const std::exception& e)
         {

@@ -159,7 +159,7 @@ struct target_count
     target_q target;
     int count = 0;
 };
-enum class GISAID_format {fasta, allnuc, allprot, allaa, allcodon, allnucprot, allnucaa, allnucprotcodon, allnucprotcodonaa};
+enum class GISAID_format {fasta, gene_msa, msa, allprot, allaa, allcodon, allnucprot, allnucaa, allnucprotcodon, allnucprotcodonaa};
 class SplitCoVfasta;
 struct SplitGene
 {
@@ -171,20 +171,19 @@ struct SplitGene
     std::vector<oligo>  all_oligos;
     int                 forw_idx{}, rev_idx{};    
 
-    //oligo_seq_t   ref_seq;
-    //msa_seq_t     msa_ref;
-    long          ref_beg{0}, ref_end{0}, 
-                  msa_beg{0}, msa_end{0};
-    int           msa_len{0}, ref_len{0};
-    //bool          reverse{false};
+    long          ref_beg{0}, ref_end{0},  // amplicon positions in the reference sequence
+                  msa_beg{0}, msa_end{0};  // amplicon positions in the MSA
+    int           msa_len{0}, ref_len{0};  // length of the amplicon
 
     bool read_oligos(const std::filesystem::path& oligos);
 
     // References and pointers to either key or data stored in the container 
     // are only invalidated by erasing that element, even when the corresponding 
     // iterator is invalidated.
-    using grouped_by_seq = std::unordered_map<msa_seq_t, target_count>;
-    grouped_by_seq      grouped; 
+    using grouped_by_msa_seq = std::unordered_map<msa_seq_t  , target_count>;
+    using grouped_by_seq     = std::unordered_map<oligo_seq_t, target_count>;
+    grouped_by_msa_seq  msa_grouped; 
+    grouped_by_seq      grouped;
     int                 count{0}; 
 
     SplitGene( SplitCoVfasta &parent, std::string gene);
@@ -194,12 +193,12 @@ struct SplitGene
     void evaluate_target            (target_q  &tq, const msa_seq_t &full_target);
     void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
-    void align   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target);
-    void re_align(pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);
+    void align_to_msa   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target   );  // not used
+    void re_align       (pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);  // to exact target
 
-    bool reconstruct_seq(const msa_seq_t &s, oligo_seq_t &seq,
+    bool reconstruct_msa_seq(const msa_seq_t &s, oligo_seq_t &seq,
                          long msa_beg, long msa_end, int tent_len);
-    void write_grouped ();
+    void write_msa_grouped ();
 };    
 
 
@@ -246,9 +245,12 @@ class SplitCoVfasta
         genes.emplace_back(*this, gene).read_oligos(oligos);
     }
 
+    GISAID_format check_format();
+    void split_msa( );
     void split_fasta( );
     void set_ref_pos();
-    bool extract_seq(const msa_seq_t &full_msa_seq, 
+    void set_msa_ref_pos();
+    bool extract_msa_seq(const msa_seq_t &full_msa_seq, 
                                msa_seq_t &msa_fragment, 
                              oligo_seq_t &reconstructed_seq,
                         long msa_beg, long msa_end, int tent_len = 0) ;
