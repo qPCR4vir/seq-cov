@@ -471,10 +471,25 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_targ
 
 target_count& SplitGene::check_rec(auto& record)
 {
+    oligo_seq_t& full_target = record.sequence();
+    count++;
+
+    target_count & target_c = grouped[{full_target.begin()+ref_beg, 
+                                       full_target.begin()+ref_end}]; 
+    if (!target_c.count)  // new target sequence
+        evaluate_target(target_c.target, full_target);
+    
+    target_c.count++;
+    return target_c;   
+}
+
+target_count& SplitGene::check_msa_rec(auto& record)
+{
     msa_seq_t& full_target = record.sequence();
     count++;
 
-    target_count & target_c = msa_grouped[{full_target.begin()+msa_beg, full_target.begin()+msa_end}]; 
+    target_count & target_c = msa_grouped[{full_target.begin()+msa_beg, 
+                                           full_target.begin()+msa_end}]; 
     if (!target_c.count)  // new target sequence
         evaluate_target(target_c.target, full_target);
     

@@ -189,7 +189,9 @@ struct SplitGene
     SplitGene( SplitCoVfasta &parent, std::string gene);
     
     /// record identified and ...?
-    target_count& check_rec(auto& record);
+    target_count& check_msa_rec     (auto& record);
+    target_count& check_rec         (auto& record);
+
     void evaluate_target            (target_q  &tq, const msa_seq_t &full_target);
     void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
