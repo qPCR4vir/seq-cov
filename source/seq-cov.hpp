@@ -85,7 +85,7 @@ struct OLIGO : seqan3::sequence_file_input_default_traits_dna
     using sequence_alphabet = oligo_seq_alph; // instead of dna5
     
 };
-
+struct SeqPos {long beg{0}, end{0};};
 struct oligo
 {
     oligo_seq_t   seq, ref_seq;
@@ -192,9 +192,10 @@ struct SplitGene
     target_count& check_msa_rec     (auto& record);
     target_count& check_rec         (auto& record);
 
+    SeqPos find_ampl_pos            (const oligo_seq_t& target);
     void evaluate_msa_target        (target_q  &tq, const msa_seq_t &full_target);
     void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
-    void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
+    void evaluate_msa_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
     void align_to_msa   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target   );  // not used
     void re_align       (pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);  // to exact target
 
