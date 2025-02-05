@@ -192,7 +192,7 @@ struct SplitGene
     target_count& check_msa_rec     (auto& record);
     target_count& check_rec         (auto& record);
 
-    void evaluate_target            (target_q  &tq, const msa_seq_t &full_target);
+    void evaluate_msa_target        (target_q  &tq, const msa_seq_t &full_target);
     void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
     void align_to_msa   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target   );  // not used

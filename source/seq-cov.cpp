@@ -409,26 +409,21 @@ void SplitGene::target_pattern(target_q & tq, const msa_seq_t& full_target)
     }
 }
 
-void SplitGene::evaluate_target(target_q & tq, const msa_seq_t& full_target)
+void SplitGene::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
 {
     for (oligo& primer : all_oligos)   
     {
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
-    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     //for (pattern_q& pq : tq.patterns)   
+    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     {
-        evaluate_target_primer(pq, full_target);
-    }//
-    );
+        evaluate_msa_target_primer(pq, full_target);
+    });
     target_pattern(tq, full_target);
 
-    /*
-    for (auto & primer : f_primers) evaluate_target_primer(tq, primer, sq);
-    for (auto & primer : r_primers) evaluate_target_primer(tq, primer, sq);
-    for (auto & probe  : probes_s ) evaluate_target_primer(tq, probe , sq);
-    for (auto & probe  : probes_a ) evaluate_target_primer(tq, probe , sq); */
     for (auto & pq : tq.patterns)
+        if constexpr (debugging >= debugging_DEBUG)
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
@@ -469,6 +464,22 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const msa_seq_t& full_targ
  
 }
 
+// Some functions are now split into two versions: one for the old MSA format and a new version for the new 'raw' sequence format. 
+// As the sequences are now not pre-aligned we don't know the exact position 
+// of the amplicon and of each oligo/primer. 
+// We are saving and grouping the possible matching patterns by equal target sequences member map grouped. 
+// Thus, for each new sequence we have the following cases: 
+// 1-exact known position and sequence: just update the counters. 
+// 2-right position but new sequence: 
+//         simple check that one of external primers matches the expected position: 
+//          reuse the newly retrieved parsed_id pid to hold all the patterns, that have to be generated first. 
+// 3-New position: 
+//     first discard wrong seq/pid 
+//     them we need to align one of the external primers to the expected target first 
+//         (if not found expand by 1000 that region, 
+//             if fails use the whole sequence, 
+//             and try inverted too) 
+//     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
 target_count& SplitGene::check_rec(auto& record)
 {
     oligo_seq_t& full_target = record.sequence();
@@ -477,12 +488,13 @@ target_count& SplitGene::check_rec(auto& record)
     target_count & target_c = grouped[{full_target.begin()+ref_beg, 
                                        full_target.begin()+ref_end}]; 
     if (!target_c.count)  // new target sequence
-        evaluate_target(target_c.target, full_target);
+        evaluate_msa_target(target_c.target, full_target);
     
     target_c.count++;
     return target_c;   
 }
 
+// sequences pre-aligned into the MSA to the reference sequence
 target_count& SplitGene::check_msa_rec(auto& record)
 {
     msa_seq_t& full_target = record.sequence();
@@ -491,13 +503,13 @@ target_count& SplitGene::check_msa_rec(auto& record)
     target_count & target_c = msa_grouped[{full_target.begin()+msa_beg, 
                                            full_target.begin()+msa_end}]; 
     if (!target_c.count)  // new target sequence
-        evaluate_target(target_c.target, full_target);
+        evaluate_msa_target(target_c.target, full_target);
     
     target_c.count++;
     return target_c;   
 }
 
-void build_patterns(target_count & parent, std::string & patterns)
+void build_id_field_patterns(target_count & parent, std::string & patterns)
 {
         patterns.clear();              
         
@@ -555,7 +567,7 @@ void SplitGene::write_grouped ()
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
         target_count & parent = sg->second;
-        build_patterns(parent, patterns);
+        build_id_field_patterns(parent, patterns);
         if (patterns.empty()) continue;
 
         for (auto& [year,      yc]:  sg->second.years) 
@@ -641,7 +653,7 @@ void SplitGene::write_msa_grouped ()
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
         target_count & parent = sg->second;
-        build_patterns(parent, patterns);
+        build_id_field_patterns(parent, patterns);
         if (patterns.empty()) continue;
 
         for (auto& [year,      yc]:  sg->second.years) 
@@ -1206,7 +1218,7 @@ void SplitCoVfasta::split_msa( )
         //for (auto & gene : genes)   
         std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
         {
-            target_count& tc = gene.check_rec(record);
+            target_count& tc = gene.check_msa_rec(record);
             update_target_count(tc, pid);
         });
 
