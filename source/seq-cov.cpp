@@ -148,19 +148,19 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
         return true;
 }
 
+// eliminate gaps and put the sequencce into the oligo_seq_t seq
 bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
-    if constexpr (debugging) 
-                seqan3::debug_stream << "\nReconstructing sequence from " << msa_beg << " to " << msa_end << '\n';
+    if constexpr (debugging >= debugging_TRACE) 
+                seqan3::debug_stream << "\nReconstructing sequence from MSA positions " << msa_beg << " to " << msa_end << '\n';
     
     seq.clear();
     seq.reserve(tent_len);
     bool reverse = (msa_beg > msa_end);
-    // go through the sequence and eliminate gaps to reconstruct the original sequence
-    if (reverse) 
-    {
-        // original sequence is in reverse order
-
+    
+    if (reverse)  // original sequence is in reverse order
+    {       
+        // go through the sequence and eliminate gaps to reconstruct the original sequence
         for ( int i = msa_beg; i >= msa_end; --i)
         {
             if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
@@ -169,6 +169,7 @@ bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& 
         return true;
     }
     // original sequence is in the same order
+    // go through the sequence and eliminate gaps to reconstruct the original sequence
     for ( int i = msa_beg; i <= msa_end; ++i)
     {
         if (full_msa_seq[i].holds_alternative<seqan3::gap>() ) continue;
@@ -177,11 +178,12 @@ bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& 
     return true;
 }
 
-SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& s)
+// find both external primers in the sequence target and return the position of the amplicon
+SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
 {
     // new, unknown seq. We need to find the right position of the target sequence
     // less than 1% of the seq. May be around 50k?
-    SeqGr sg;
+    SeqPos sg;
     
     auto output_config = seqan3::align_cfg::output_score{}          | 
                             seqan3::align_cfg::output_begin_position{} |
@@ -194,19 +196,20 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& s)
                                                     seqan3::align_cfg::extension_score{-1}};
     auto config = method | scheme | gap_costs | output_config;
 
-    // try the fw primer
-    auto results = seqan3::align_pairwise(std::tie(s, forw), config);
+    // try the external fw primer
+    oligo & fw_pr = f_primers[extern_forw_idx];
+    auto results = seqan3::align_pairwise(std::tie(target, fw_pr.seq), config);
     auto & res = *results.begin();
     //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
     //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
     //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
     
-    if (res.score() > fw_match)  // forw primer found. 
+    if (res.score() > fw_pr.match)  // forw primer found. 
     {
         sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;
-        if (len)  // not the first time/seq - the "ref." seq was already set
+        if (ref_len)  // not the first time/seq - the "ref." seq was already set
         {
-            sg.end = sg.beg + len;
+            sg.end = sg.beg + ref_len;
             return sg; // only find fw pr pos. Don't count for insertions/deletions or bad rev.
         }
         else if (sg.beg < 0)
@@ -216,42 +219,41 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& s)
     }
     else 
     {
-        if (!len)
+        if (!ref_len)
             throw std::runtime_error{"First " + gene + " sequence don't contain "
                                         "the forward primer. Score: " + std::to_string(res.score() )};
         else
-            sg.beg = notfound;  // mark beg pos as not found !!
+            sg.beg = sg.end = 0;  // mark as not found !!
     }
     // we need to find rev primer location
-
-    auto res_rev = seqan3::align_pairwise(std::tie(s, rev), config);
+    auto & rev_pr = r_primers[extern_rev_idx];
+    auto res_rev = seqan3::align_pairwise(std::tie(target, rev_pr.seq), config);
     auto & res_r = *res_rev.begin();
     //seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
     //seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
     //seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";
 
-    if (res_r.score() > rv_match)  // rev primer found. 
+    if (res_r.score() > rev_pr.match)  // rev primer found. 
     {   
-        sg.end = res_r.sequence1_end_position() + (rev.size() - res_r.sequence2_end_position());
-        if (len)
-            sg.beg = sg.end - len;
-        else if (sg.end > s.size())
+        sg.end = res_r.sequence1_end_position() + (rev_pr.seq.size() - res_r.sequence2_end_position());
+        if (ref_len) 
+            sg.beg = sg.end - ref_len;
+        else if (sg.end > target.size())
             throw std::runtime_error{"First " + gene + " sequence don't contain "
             "the full reverse primer. Score: " + std::to_string(res.score()) +
             " that end at position "  + std::to_string(res.sequence2_end_position())  };
         return sg;
     }
 
-    if (!len)
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
+    if (!ref_len) throw std::runtime_error{"First " + gene + " sequence don't contain "
                                         "the reverse primer. Score: " + std::to_string(res.score() )};
-    sg.end = notfound;  // mark both beg and end pos as not found !! Better try to align whole seq?? not sure..
+    sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
     // todo  align with ref_seq
 
     return sg;
 }
 
-void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)  // re_align to exact target
+void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)  // re_align the oligo to an exact target and build primer match pattern on oligo_target
 {
     if constexpr (debugging >= debugging_TRACE) 
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
@@ -384,7 +386,7 @@ void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)  // re_
                          << oligo_target  << " - unaligned target\n" ;
 }
 
-void SplitGene::align_to_msa(pattern_q &pq,               ///< oligo_pattern_quality    // align_to_msa - not used !!
+void SplitGene::align_to_msa(pattern_q &pq,      ///< oligo_pattern_quality  // build primer match pattern on oligo_target on to the expected MSA position. - not used !!
                     const msa_seq_t &full_target)
 {
     oligo_seq_t oligo_target;
@@ -451,7 +453,7 @@ void SplitGene::align_to_msa(pattern_q &pq,               ///< oligo_pattern_qua
  
 }
 
-void SplitGene::target_pattern(target_q & tq, const msa_seq_t& full_target)
+void SplitGene::target_msa_pattern(target_q & tq, const msa_seq_t& full_target) // build target match pattern on ref on to the expected MSA positions msa_beg, msa_end.
 {
     // msa_seq_t& full_target is already aligned to the reference sequence: just create the target pattern
     tq.target_pattern.clear();
@@ -501,10 +503,11 @@ void SplitGene::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  }
 
-void SplitGene::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& full_target)
+void SplitGene::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& full_target) // build primer match pattern on full_target on to the expected MSA positions msa_beg, msa_end of the primer.
 {
     cov::oligo &primer = pq.primer;
     oligo_seq_t oligo_target;
+
     reconstruct_msa_seq(full_target, oligo_target, primer.msa_beg, primer.msa_end, primer.seq.size());
     if (oligo_target.size() != primer.len)
         //return align(pq, full_target); // todo: try to align the primer with the oligo_target sequence
@@ -557,11 +560,119 @@ target_count& SplitGene::check_rec(auto& record)
 
     target_count & target_c = grouped[{full_target.begin()+ref_beg, 
                                        full_target.begin()+ref_end}]; 
-    if (!target_c.count)  // new target sequence
-        evaluate_msa_target(target_c.target, full_target);
+    if (target_c.count) 
+    { 
+        target_c.count++;
+        return target_c;  // 1-exact known position and sequence:
+    }
     
-    target_c.count++;
+    // new target sequence
+    if (quick_check(full_target, f_primers[extern_forw_idx], 0) )
+    {
+        evaluate_target(target_c.target, full_target, ref_beg); // 2-right position but new sequence
+        target_c.count++;
+        return target_c;
+    }
+    // 3-New position:
+    // discard wrong seq/target_c
+    grouped.erase({full_target.begin()+ref_beg, 
+                   full_target.begin()+ref_end});
+    
+    // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
+    SeqPos sg = find_ampl_pos(full_target);
+    if (sg.beg < sg.end)  // found the right position
+    {
+        target_count & target_c = grouped[{full_target.begin()+sg.beg, 
+                                           full_target.begin()+sg.end}]; 
+        if (target_c.count) 
+        { 
+            target_c.count++;
+            return target_c;  // 3- known sequence but new position .  todo: register the new position !!!!! 
+        }
+        evaluate_target(target_c.target, full_target, sg.beg); // 3- new sequence in new position .  todo: register the new position !!!!! 
+        target_c.count++;
+        return target_c;
+    }
+    
     return target_c;   
+}
+
+void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
+{
+    for (oligo& primer : all_oligos)   
+    {
+        tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
+    }
+    //for (pattern_q& pq : tq.patterns)   
+    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    {
+        evaluate_target_primer(pq, full_target, ampl_beg);
+    });
+    target_pattern(tq, full_target, ampl_beg);
+
+    for (auto & pq : tq.patterns)
+        if constexpr (debugging >= debugging_DEBUG)
+        seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                             << pq.primer.seq <<'\n' 
+                             << pq.pattern << '\n'
+                             //<< target << '\n' 
+                             << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
+ }
+
+ bool quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
+ {
+    int pr_beg = primer.ref_beg + offset;
+    int len = primer.seq.size();
+    int mm = len - primer.match;  // maximum number of mismatches
+    if (mm < 1) mm = 1;  // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
+    for (int i = 0; i < len; ++i)
+    {
+        if (!mismatch.score(primer.seq[i], target[pr_beg + i]))   
+            if (--mm ) return false;
+    }
+    return true;
+ }
+
+void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long ampl_beg) // build primer match pattern on full_target at positions beg
+{
+    cov::oligo &primer = pq.primer;
+    oligo_seq_t oligo_target;
+ 
+    pq.pattern = std::string(primer.len, '.');
+    for (int i = 0; i < primer.len; ++i)
+    {
+        if (!mismatch.score(primer.seq[i], full_target[ampl_beg + i]))   continue;
+
+        if  (oligo_target[i] == 'N'_dna15)  
+        {
+            pq.N++;
+            pq.pattern[i] = 'N';
+            continue;
+        }
+        pq.pattern[i] = oligo_target[i].to_char();
+        pq.mm++;
+        if (i >= primer.len - parent.crit_term_nt)                   pq.crit++;
+     }
+    pq.Q = pq.mm + pq.crit * 4;
+        seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
+                             << pq.primer.seq <<'\n' 
+                             << pq.pattern << '\n'
+                             << oligo_target << '\n' 
+                             << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
+}
+
+void SplitGene::target_pattern(target_q & tq, const oligo_seq_t &full_target, long ampl_beg)// build target match pattern on ref at ampl_beg
+{
+    // already aligned to the reference sequence: just create the target pattern
+    tq.target_pattern = std::string(ref_len, '.');
+
+    for ( int i = 0; i < ref_len; ++i)
+    {
+        auto s =    full_target[ ampl_beg + i];
+        auto r = parent.ref_seq[ ref_beg + i];
+        if (mismatch.score(s, r))   // 0 if equal
+           tq.target_pattern[i] = s.to_char();   
+    }
 }
 
 // sequences pre-aligned into the MSA to the reference sequence
@@ -575,7 +686,7 @@ target_count& SplitGene::check_msa_rec(auto& record)
     if (!target_c.count)  // new target sequence
         evaluate_msa_target(target_c.target, full_target);
     
-    target_c.count++;
+    target_c.count++;  // assume always found
     return target_c;   
 }
 
@@ -1316,6 +1427,8 @@ void SplitCoVfasta::split_msa( )
 
 void SplitCoVfasta::update_target_count(target_count& tc, const parsed_id& pid)
 {
+    if (!tc.count) return;
+
     year_count& yc = tc.years[pid.year];
     yc.count++;
     

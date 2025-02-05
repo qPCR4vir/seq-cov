@@ -169,7 +169,7 @@ struct SplitGene
     const std::string   gene;
     std::vector<oligo>  f_primers, r_primers, probes_s, probes_a;
     std::vector<oligo>  all_oligos;
-    int                 extern_forw_idx{}, extern_rev_idx{};    
+    int                 extern_forw_idx{}, extern_rev_idx{};  // index of the external primer in f_primers and r_primers respectively
 
     long          ref_beg{0}, ref_end{0},  // amplicon positions in the reference sequence
                   msa_beg{0}, msa_end{0};  // amplicon positions in the MSA
@@ -193,9 +193,12 @@ struct SplitGene
     target_count& check_rec         (auto& record);
 
     SeqPos find_ampl_pos            (const oligo_seq_t& target);
+    void target_pattern             (target_q  &tq, const oligo_seq_t &full_target, long ampl_beg);
+    void evaluate_target            (target_q  &tq, const oligo_seq_t &full_target, long ampl_beg);
+    void evaluate_target_primer     (pattern_q &pq, const oligo_seq_t &full_target, long ampl_beg);
     void evaluate_msa_target        (target_q  &tq, const msa_seq_t &full_target);
-    void target_pattern             (target_q  &tq, const msa_seq_t &full_target);
-    void evaluate_msa_target_primer     (pattern_q &pq, const msa_seq_t &full_target);
+    void target_msa_pattern         (target_q  &tq, const msa_seq_t &full_target);
+    void evaluate_msa_target_primer (pattern_q &pq, const msa_seq_t &full_target);
     void align_to_msa   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target   );  // not used
     void re_align       (pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);  // to exact target
 
@@ -251,16 +254,17 @@ class SplitCoVfasta
 
     GISAID_format check_format();
     void split();
-private:
+    bool extract_msa_seq(const msa_seq_t &full_msa_seq, 
+                               msa_seq_t &msa_fragment, 
+                             oligo_seq_t &reconstructed_seq,
+                        long msa_beg, long msa_end, int tent_len = 0) ;
+ private:
     void update_target_count(target_count& tc, const parsed_id& pid);
     void split_msa( );
     void split_fasta( );
     void set_ref_pos();
     void set_msa_ref_pos();
-    bool extract_msa_seq(const msa_seq_t &full_msa_seq, 
-                               msa_seq_t &msa_fragment, 
-                             oligo_seq_t &reconstructed_seq,
-                        long msa_beg, long msa_end, int tent_len = 0) ;
+
     void parse_id_allnuc(const std::string& id, parsed_id& pid);  // deprecated
     void parse_id       (const std::string& id, parsed_id& pid);  // deprecated
 
