@@ -614,6 +614,7 @@ target_count& SplitGene::check_rec(auto& record)
 
 void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
 {
+    int offset = ampl_beg - ref_beg;
     for (oligo& primer : all_oligos)   
     {
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
@@ -621,7 +622,7 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
     //for (pattern_q& pq : tq.patterns)   
     std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     {
-        evaluate_target_primer(pq, full_target, ampl_beg);
+        evaluate_target_primer(pq, full_target, offset);
     });
     target_pattern(tq, full_target, ampl_beg);
 
@@ -678,7 +679,7 @@ void SplitGene::target_pattern(target_q & tq, const oligo_seq_t &full_target, lo
     for ( int i = 0; i < ref_len; ++i)
     {
         auto s =    full_target[ ampl_beg + i];
-        auto r = parent.ref_seq[ ref_beg + i];
+        auto r = parent.ref_seq[ ref_beg + i - 1];
         if (mismatch.score(s, r))   // 0 if equal
            tq.target_pattern[i] = s.to_char();   
     }
