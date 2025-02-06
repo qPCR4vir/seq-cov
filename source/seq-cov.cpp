@@ -635,31 +635,38 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
  }
 
 
-void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long ampl_beg) // build primer match pattern on full_target at positions beg
+void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long offset) // build primer match pattern on full_target at positions beg
 {
     cov::oligo &primer = pq.primer;
-    oligo_seq_t oligo_target;
- 
     pq.pattern = std::string(primer.len, '.');
+    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq 
+                                                                     << " wih initial pattern " << pq.pattern <<'\n'  ;
+
+    int pr_beg = primer.ref_beg + offset;
+ 
     for (int i = 0; i < primer.len; ++i)
     {
-        if (!mismatch.score(primer.seq[i], full_target[ampl_beg + i]))   continue;
+        auto t = full_target[pr_beg + i];
+        if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "Checking position " << i << ": " << primer.seq[i] << " vs " << t << '\n';
+        if (!mismatch.score(primer.seq[i], t))   continue;
+        if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "Mismatch found " << '\n';
 
-        if  (oligo_target[i] == 'N'_dna15)  
+        if  (t == 'N'_dna15)  
         {
             pq.N++;
             pq.pattern[i] = 'N';
             continue;
         }
-        pq.pattern[i] = oligo_target[i].to_char();
+        pq.pattern[i] = t.to_char();
         pq.mm++;
         if (i >= primer.len - parent.crit_term_nt)                   pq.crit++;
      }
     pq.Q = pq.mm + pq.crit * 4;
+    if constexpr (debugging >= debugging_TRACE)  
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
                              << pq.primer.seq <<'\n' 
                              << pq.pattern << '\n'
-                             << oligo_target << '\n' 
+                             //<< oligo_target << '\n' 
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
 }
 

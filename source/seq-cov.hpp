@@ -199,7 +199,7 @@ struct SplitGene
     SeqPos find_ampl_pos            (const oligo_seq_t& target);
     void target_pattern             (target_q  &tq, const oligo_seq_t &full_target, long ampl_beg);
     void evaluate_target            (target_q  &tq, const oligo_seq_t &full_target, long ampl_beg);
-    void evaluate_target_primer     (pattern_q &pq, const oligo_seq_t &full_target, long ampl_beg);
+    void evaluate_target_primer     (pattern_q &pq, const oligo_seq_t &full_target, long offset);
     void evaluate_msa_target        (target_q  &tq, const msa_seq_t &full_target);
     void target_msa_pattern         (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_msa_target_primer (pattern_q &pq, const msa_seq_t &full_target);
