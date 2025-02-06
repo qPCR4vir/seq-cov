@@ -41,6 +41,19 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 };
 */
 
+ bool SplitGene::quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
+ {
+    int pr_beg = primer.ref_beg + offset;
+    int len = primer.seq.size();
+    int mm = len - primer.match;  // maximum number of mismatches
+    if (mm < 1) mm = 1;  // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
+    for (int i = 0; i < len; ++i)
+    {
+        if (!mismatch.score(primer.seq[i], target[pr_beg + i]))   
+            if (--mm ) return false;
+    }
+    return true;
+ }
 
 // struct SplitGene
  
@@ -619,19 +632,6 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  }
 
- bool quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
- {
-    int pr_beg = primer.ref_beg + offset;
-    int len = primer.seq.size();
-    int mm = len - primer.match;  // maximum number of mismatches
-    if (mm < 1) mm = 1;  // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
-    for (int i = 0; i < len; ++i)
-    {
-        if (!mismatch.score(primer.seq[i], target[pr_beg + i]))   
-            if (--mm ) return false;
-    }
-    return true;
- }
 
 void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long ampl_beg) // build primer match pattern on full_target at positions beg
 {

@@ -210,6 +210,7 @@ struct SplitGene
                          long msa_beg, long msa_end, int tent_len);
     void write_msa_grouped();
     void write_grouped();
+    bool quick_check(const oligo_seq_t &target, const oligo &primer, long offset); // check if the primer matches the target at the expected position
 };    
 
 
