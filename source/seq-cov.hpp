@@ -4,6 +4,14 @@
 #include <vector>
 #include <filesystem>
 #include <unordered_map>
+#include <ranges>
+
+// // Define a fallback value for hardware_destructive_interference_size
+// #ifndef __cpp_lib_hardware_interference_size
+// constexpr std::size_t hardware_destructive_interference_size = 64; // Typical cache line size
+// #else
+// constexpr std::size_t hardware_destructive_interference_size = std::hardware_destructive_interference_size;
+// #endif
 
 #include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
 #include <seqan3/alignment/scoring/nucleotide_scoring_scheme.hpp> // for nucleotide_scoring_scheme
@@ -23,9 +31,9 @@ enum {  debugging_NOT_USED= 0,
 constexpr auto debugging = debugging_TRACE;  // How much debug info to print
 // todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
 
-
-namespace std
+namespace cov
 {
+
 /*!\brief Struct for hashing a range of characters.
  * \ingroup alphabet_range
  * \tparam urng_t The type of the range; Must model std::ranges::input_range and the reference type of the range of the
@@ -33,11 +41,11 @@ namespace std
  * \details
  * \experimentalapi{Experimental since version 3.1.}
  */
-template <ranges::input_range urng_t>
+template <std::ranges::input_range urng_t>
 //!\cond
     requires seqan3::semialphabet<std::ranges::range_reference_t<urng_t>>
 //!\endcond
-struct hash<urng_t>
+struct hash
 {
     /*!\brief Compute the hash for a range of characters.
      * \tparam urng2_t  The same as `urng_t` (+- cvref); used to get forwarding reference in the interface.
@@ -47,7 +55,7 @@ struct hash<urng_t>
      * \details
      * \experimentalapi{Experimental since version 3.1.}
      */
-    template <ranges::input_range urng2_t>
+    template <std::ranges::input_range urng2_t>
     //!\cond
         requires seqan3::semialphabet<std::ranges::range_reference_t<urng2_t>>
     //!\endcond
@@ -55,7 +63,7 @@ struct hash<urng_t>
     {
         using alphabet_t = std::ranges::range_reference_t<urng_t>;
         size_t result{0};
-        hash<alphabet_t> h{};
+        std::hash<alphabet_t> h{};
         for (auto character : range)
         {
             result *= seqan3::alphabet_size<alphabet_t>;
@@ -63,11 +71,7 @@ struct hash<urng_t>
         }
         return result;
     }
-};
-} // namespace std
-
-namespace cov
-{
+};    
 using namespace seqan3::literals;
 
 using oligo_seq_alph = seqan3::dna15;
@@ -180,8 +184,8 @@ struct SplitGene
     // References and pointers to either key or data stored in the container 
     // are only invalidated by erasing that element, even when the corresponding 
     // iterator is invalidated.
-    using grouped_by_msa_seq = std::unordered_map<msa_seq_t  , target_count>;
-    using grouped_by_seq     = std::unordered_map<oligo_seq_t, target_count>;
+    using grouped_by_msa_seq = std::unordered_map<msa_seq_t  , target_count, hash<msa_seq_t>>;
+    using grouped_by_seq     = std::unordered_map<oligo_seq_t, target_count, hash<oligo_seq_t>>;
     grouped_by_msa_seq  msa_grouped; 
     grouped_by_seq      grouped;
     int                 count{0}; 

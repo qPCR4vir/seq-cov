@@ -185,7 +185,7 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
     // less than 1% of the seq. May be around 50k?
     SeqPos sg;
     
-    auto output_config = seqan3::align_cfg::output_score{}          | 
+    auto output_config =    seqan3::align_cfg::output_score{}          | 
                             seqan3::align_cfg::output_begin_position{} |
                             seqan3::align_cfg::output_end_position{}   | 
                             seqan3::align_cfg::output_alignment{};
