@@ -204,7 +204,7 @@ struct SplitGene
     void target_msa_pattern         (target_q  &tq, const msa_seq_t &full_target);
     void evaluate_msa_target_primer (pattern_q &pq, const msa_seq_t &full_target);
     void align_to_msa   (pattern_q &oligo_pattern_quality, const msa_seq_t &full_target   );  // not used
-    void re_align       (pattern_q &oligo_pattern_quality, const oligo_seq_t &oligo_target);  // to exact target
+    void re_align       (pattern_q &oligo_pattern_quality, oligo_seq_t &oligo_target);  // to exact target
 
     bool reconstruct_msa_seq(const msa_seq_t &s, oligo_seq_t &seq,
                          long msa_beg, long msa_end, int tent_len);
@@ -264,7 +264,7 @@ class SplitCoVfasta
                              oligo_seq_t &reconstructed_seq,
                         long msa_beg, long msa_end, int tent_len = 0) ;
  private:
-    void update_target_count(target_count& tc, const parsed_id& pid);
+    void update_target_count(target_count& tc, parsed_id& pid);
     void split_msa( );
     void split_fasta( );
     void set_ref_pos();

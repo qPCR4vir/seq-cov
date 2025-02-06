@@ -12,18 +12,20 @@
 
 	
 // #include <seqan3/std/ranges>                    // include all of the standard library's views
-#include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
-#include <seqan3/alphabet/hash.hpp>
-#include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
+#include <seqan3/alphabet/all.hpp>
+// #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
+// #include <seqan3/alphabet/hash.hpp>
+// #include <seqan3/alphabet/nucleotide/dna15.hpp> // seqan3::gapped<seqan3::dna15>
 //#include <seqan3/alphabet/range/hash.hpp>
 #include <seqan3/core/debug_stream.hpp>         
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/io/sequence_file/all.hpp>      // for sequence_file_input and sequence_file_output
 #include <seqan3/argument_parser/all.hpp> 
+// #include <seqan3/alignment/all.hpp>
 #include <seqan3/alignment/configuration/align_config_method.hpp>
-#include <seqan3/alignment/pairwise/align_pairwise.hpp>
 #include <seqan3/alignment/configuration/align_config_edit.hpp>
 #include <seqan3/alignment/configuration/align_config_output.hpp>
+#include <seqan3/alignment/pairwise/align_pairwise.hpp>
 
 #include "seq-cov.hpp"
 
@@ -266,7 +268,7 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
     return sg;
 }
 
-void SplitGene::re_align(pattern_q &pq, const oligo_seq_t &oligo_target)  // re_align the oligo to an exact target and build primer match pattern on oligo_target
+void SplitGene::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align the oligo to an exact target and build primer match pattern on oligo_target
 {
     if constexpr (debugging >= debugging_TRACE) 
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
@@ -505,7 +507,7 @@ void SplitGene::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
     {
         evaluate_msa_target_primer(pq, full_target);
     });
-    target_pattern(tq, full_target);
+    target_msa_pattern(tq, full_target);
 
     for (auto & pq : tq.patterns)
         if constexpr (debugging >= debugging_DEBUG)
@@ -690,21 +692,16 @@ target_count& SplitGene::check_msa_rec(auto& record)
     return target_c;   
 }
 
-void build_id_field_patterns(target_count & parent, std::string & patterns)
+void build_id_field_patterns(target_count & target_c, std::string & patterns)
 {
         patterns.clear();              
-        
-        // discard sequences with too many N.
-        if (std::all_of(parent.target.patterns.begin(), parent.target.patterns.end(), 
-                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
-            return;
 
-        for (auto& pq : parent.target.patterns)
+        for (auto& pq : target_c.target.patterns)
         {
             patterns += std::format("|{}_Q_{}_mm_{}_N_{}_crit_{}_pat_{}", 
                             pq.primer.name, pq.Q, pq.mm, pq.N, pq.crit, pq.pattern);
         }
-        patterns += "|" + parent.target.target_pattern + "|" ;  // at the end we will add the count    
+        patterns += "|" + target_c.target.target_pattern + "|" ;  // at the end we will add the count    
 }
 
 void SplitGene::write_grouped ()
@@ -747,8 +744,14 @@ void SplitGene::write_grouped ()
 
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
-        target_count & parent = sg->second;
-        build_id_field_patterns(parent, patterns);
+                
+
+        target_count & target_c = sg->second;
+        // discard sequences with too many N.
+        if (std::all_of(target_c.target.patterns.begin(), target_c.target.patterns.end(), 
+                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
+            return;
+        build_id_field_patterns(target_c, patterns);
         if (patterns.empty()) continue;
 
         for (auto& [year,      yc]:  sg->second.years) 
@@ -833,8 +836,14 @@ void SplitGene::write_msa_grouped ()
 
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
-        target_count & parent = sg->second;
-        build_id_field_patterns(parent, patterns);
+        target_count & target_c = sg->second;
+        
+        // discard sequences with too many N.
+        if (std::all_of(target_c.target.patterns.begin(), target_c.target.patterns.end(), 
+                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
+            return;
+
+        build_id_field_patterns(target_c, patterns);
         if (patterns.empty()) continue;
 
         for (auto& [year,      yc]:  sg->second.years) 
@@ -1352,7 +1361,9 @@ GISAID_format SplitCoVfasta::check_format()
 
     // if debuging print the format found
     if constexpr (debugging) 
-        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';        
+        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';   
+
+    return format;     
 }
 
 void SplitCoVfasta::split( )
@@ -1475,7 +1486,7 @@ void SplitCoVfasta::split_msa( )
 
 }
 
-void SplitCoVfasta::update_target_count(target_count& tc, const parsed_id& pid)
+void SplitCoVfasta::update_target_count(target_count& tc, parsed_id& pid)
 {
     if (!tc.count) return;
 
