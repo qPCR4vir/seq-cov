@@ -1104,13 +1104,13 @@ void SplitCoVfasta::read_metadata()
     // (some do this at the start of main)
     // std::ios::sync_with_stdio(false);
     // std::cin.tie(nullptr);
-
+    long date_errors = 0;
     size_t lines_parsed = 0;
     while (std::getline(metadata_file, line))
     {
-        ++lines_parsed;
         if (line.empty()) continue;
-
+        ++lines_parsed;
+        
         // 2.1. Tokenize this line by tab into `cols` as string_views
         cols.clear();
         {
@@ -1156,8 +1156,8 @@ void SplitCoVfasta::read_metadata()
         if (idx_date_it->second < cols.size())
         {
             std::string_view date_sv = cols[idx_date_it->second];
-            // e.g. "2021-03-31"
-            if (date_sv.size() == 10)
+           
+            if (date_sv.size() == 10)  // e.g. "2021-03-31"
             {
                 auto d = date_sv.data();
               
@@ -1168,8 +1168,58 @@ void SplitCoVfasta::read_metadata()
                 // optional: check fc1.ec, fc2.ec, fc3.ec for parse errors
             }
             else  // log debug, and try using chrono to parse the date
+            if (date_sv.size() == 7)  // e.g. "2021-03"
             {
-                seqan3::debug_stream << "ERROR: [read_metadata] Unexpected date format: " << date_sv << '\n';
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+                auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
+
+                // optional: check fc1.ec, fc2.ec for parse errors
+            }
+            else  // log debug, and try using chrono to parse the date
+            if (date_sv.size() == 4)  // e.g. "2021"
+            {
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+
+                // optional: check fc1.ec for parse errors
+            }
+            else  
+            // 2024-1
+            if (date_sv.size() == 6)  // e.g. "2021-3"
+            {
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+                auto fc2 = std::from_chars(d + 5, d +  6, pid.month);  // parse month
+
+                // optional: check fc1.ec, fc2.ec for parse errors
+            }
+            else
+            // 2023-12-4 or 2023-9-25 
+            if (date_sv.size() == 9)  // e.g. "2023-12-4" or "2023-9-25"
+            {
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+                if (d[7] == '-')  // 2023-9-25
+                {
+                    auto fc2 = std::from_chars(d + 5, d +  6, pid.month);  // parse month
+                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  // parse day
+                }
+                else  // 2023-12-4
+                {
+                    auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
+                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  // parse day
+                }
+            }
+            else
+            // log debug, and try using chrono to parse the date
+            {
+                if (date_errors < 50)
+                seqan3::debug_stream << "ERROR: [read_metadata] " << ++date_errors << "- Unexpected date format: " << date_sv << " in " << line << '\n';
 
                 // std::chrono::year_month_day ymd;
                 // // try to parse the date using chrono    from_stream 
@@ -1240,7 +1290,7 @@ void SplitCoVfasta::read_metadata()
     }
 
     if constexpr (debugging)
-        seqan3::debug_stream << "[read_metadata] Parsed " << lines_parsed 
+        seqan3::debug_stream << "[read_metadata] Parsed "  << lines_parsed 
                              << " lines. metadata.size()=" << metadata.size() << '\n';
 }
 
