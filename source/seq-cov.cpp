@@ -1054,13 +1054,35 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 {
     // parse the id of the fasta record, like:
     // hCoV-19/USA/CO-CDPHE-2010040598/2020|2020-10-02|2021-09-04 
-
+  try
+  {
     std::size_t country_beg = 8;
     std::size_t country_end = id.find('/',   country_beg) - 1;          
     std::size_t country_len = country_end - country_beg   + 1;
     std::size_t isolate_beg = country_end                 + 2;
     std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
     std::size_t isolate_len = isolate_end - isolate_beg   + 1;
+
+    pid.country = id.substr(country_beg, country_len);
+    pid.isolate = id.substr(isolate_beg, isolate_len);
+
+    // parse the two dates and todo take the early as the collection date in pid.year, pid.month, pid.day
+    std::size_t date_beg = id.find('|', isolate_end) + 1;
+    std::size_t date_end = id.find('|', date_beg) - 1;
+    std::size_t date_len = date_end - date_beg + 1;
+    std::string date1 = id.substr(date_beg, date_len);
+    // save the collection date in pid.year, pid.month, pid.day
+    pid.year  = std::stoi(date1.substr(0, 4));
+    pid.month = std::stoi(date1.substr(5, 2));
+    pid.day   = std::stoi(date1.substr(8, 2));/* code */
+  }
+    catch(const std::exception& e)
+    {
+        if constexpr (debugging >= debugging_ERROR) 
+            seqan3::debug_stream << "Error parsing missing in metadata id: " << id 
+                                << ", becouse of: " << e.what() << '\n';
+    }
+ 
 
 }
 
