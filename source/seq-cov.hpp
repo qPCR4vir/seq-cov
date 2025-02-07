@@ -27,8 +27,9 @@ enum {  debugging_NOT_USED= 0,
         debugging_INFO    = 30, 
         debugging_VERBOSE = 35,
         debugging_DEBUG   = 40, 
-        debugging_TRACE   = 80};
-constexpr auto debugging = debugging_TRACE;  // How much debug info to print
+        debugging_TRACE   = 80,
+        debugging_ALL     = 1000};
+constexpr auto debugging = debugging_ALL;  // How much debug info to print
 // todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
 
 namespace cov

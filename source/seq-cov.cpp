@@ -166,7 +166,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 // eliminate gaps and put the sequencce into the oligo_seq_t seq
 bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
-    if constexpr (debugging >= debugging_TRACE) 
+    if constexpr (debugging >= debugging_TRACE+3) 
                 seqan3::debug_stream << "\nReconstructing sequence from MSA positions " << msa_beg << " to " << msa_end << '\n';
     
     seq.clear();
@@ -211,13 +211,18 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
                                                     seqan3::align_cfg::extension_score{-1}};
     auto config = method | scheme | gap_costs | output_config;
 
-    // try the external fw primer
+    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "try to align the external fw primer to target: " << '\n';
+
     oligo & fw_pr = f_primers[extern_forw_idx];
     auto results = seqan3::align_pairwise(std::tie(target, fw_pr.seq), config);
+    
+    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "check if there are results" << '\n';
+    
     auto & res = *results.begin();
-    //seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
-    //seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-    //seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;
+    if constexpr (debugging >= debugging_TRACE+3) 
+    {seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
+    seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+    seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
     
     if (res.score() > fw_pr.match)  // forw primer found. 
     {
@@ -244,9 +249,10 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
     auto & rev_pr = r_primers[extern_rev_idx];
     auto res_rev = seqan3::align_pairwise(std::tie(target, rev_pr.seq), config);
     auto & res_r = *res_rev.begin();
-    //seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
-    //seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-    //seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";
+    if constexpr (debugging >= debugging_TRACE+3) 
+    {seqan3::debug_stream << "\nAlignment: " << res_r.alignment() << " Score: " << res_r.score() ;
+    seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+    seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";}
 
     if (res_r.score() > rev_pr.match)  // rev primer found. 
     {   
@@ -286,10 +292,10 @@ void SplitGene::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align 
                                                     seqan3::align_cfg::extension_score{-1}};*/
 
     auto config = method |  scheme |output_config; // gap_costs |
-    if constexpr (debugging >= debugging_TRACE) 
+    if constexpr (debugging >= debugging_TRACE+3) 
                 seqan3::debug_stream << "\nTarget: " << oligo_target << "\nPrimer: " << pq.primer.seq << '\n';
 
-    if constexpr (debugging >= debugging_TRACE) 
+    if constexpr (debugging >= debugging_TRACE+3) 
                 seqan3::debug_stream << " Going to check results\n";     
 
     for (auto const & res : seqan3::align_pairwise(std::tie(oligo_target,  // sequence1 = target
@@ -314,7 +320,7 @@ void SplitGene::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align 
             int len_a_tg = aligned_target.size(); 
             int len = std::max(len_a_pr, len_a_tg);
 
-            if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << " cont...\n" ;
+            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << " cont...\n" ;
 
             int o_p = res.sequence2_begin_position();  // add needed '-' to the pattern before aligned region ??
             if (o_p) pq.pattern = std::string(o_p, '-');
@@ -582,19 +588,34 @@ target_count& SplitGene::check_rec(auto& record)
     }
     
     // new target sequence
+    // debug-log goint to check the target sequence
+    if constexpr (debugging >= debugging_TRACE+3) 
+        seqan3::debug_stream << "\nChecking new target sequence: " << record.id() << " with " << full_target.size() 
+                             << " with extern_forw_idx " << extern_forw_idx << " primer of " << f_primers.size() <<  "\n";
+
     if (quick_check(full_target, f_primers[extern_forw_idx], 0) )
     {
+        if constexpr (debugging >= debugging_TRACE+3) 
+            seqan3::debug_stream << "\nFound the forward primer at the expected position: " << f_primers[extern_forw_idx].name << "\n";
         evaluate_target(target_c.target, full_target, ref_beg); // 2-right position but new sequence
         target_c.count++;
         return target_c;
     }
     // 3-New position:
+    
     // discard wrong seq/target_c
+    if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarding wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
+    
     grouped.erase({full_target.begin()+ref_beg, 
                    full_target.begin()+ref_end});
     
+    if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
+    
     // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
     SeqPos sg = find_ampl_pos(full_target);
+    
+    if constexpr (debugging >= debugging_TRACE)    seqan3::debug_stream << "\nFound the amplicon position: " << sg.beg << " to " << sg.end << "\n";
+    
     if (sg.beg < sg.end)  // found the right position
     {
         target_count & target_c = grouped[{full_target.begin()+sg.beg, 
@@ -602,9 +623,15 @@ target_count& SplitGene::check_rec(auto& record)
         if (target_c.count) 
         { 
             target_c.count++;
+            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nFound the amplicon alrready: " << target_c.target.target_pattern << "\n";
             return target_c;  // 3- known sequence but new position .  todo: register the new position !!!!! 
         }
+        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Going to evaluate the target sequence" << '\n';
+        
         evaluate_target(target_c.target, full_target, sg.beg); // 3- new sequence in new position .  todo: register the new position !!!!! 
+        
+        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Evaluated the target sequence" << '\n';
+
         target_c.count++;
         return target_c;
     }
@@ -619,11 +646,13 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
     {
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
+    if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nGoing to evaluate the target sequence with number of primer pattenrs: " << tq.patterns.size() << '\n';
     //for (pattern_q& pq : tq.patterns)   
     std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     {
         evaluate_target_primer(pq, full_target, offset);
     });
+    if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nGoing to evaluate the target sequence self " << tq.patterns.size() << '\n';
     target_pattern(tq, full_target, ampl_beg);
 
     for (auto & pq : tq.patterns)
@@ -635,12 +664,11 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  }
 
-
 void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long offset) // build primer match pattern on full_target at positions beg
 {
     cov::oligo &primer = pq.primer;
     pq.pattern = std::string(primer.len, '.');
-    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq 
+    if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq 
                                                                      << " wih initial pattern " << pq.pattern <<'\n'  ;
 
     int pr_beg = primer.ref_beg + offset;
@@ -650,7 +678,7 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_ta
         auto t = full_target[pr_beg + i];
         if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "Checking position " << i << ": " << primer.seq[i] << " vs " << t << '\n';
         if (!mismatch.score(primer.seq[i], t))   continue;
-        if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "Mismatch found " << '\n';
+        if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Mismatch found " << '\n';
 
         if  (t == 'N'_dna15)  
         {
@@ -1395,24 +1423,27 @@ void SplitCoVfasta::split_fasta( )
 
     for (auto && record : file_in)             // read each sequence in the file
     {
-        if constexpr (debugging)
-            seqan3::debug_stream << "\n" << record.id() << '\n' ;
+        if constexpr (debugging >= debugging_TRACE)          seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
         std::string_view virus_name = record.id();
         virus_name = virus_name.substr(0, virus_name.find('|'));
 
-        parsed_id& pid = metadata[std::string{virus_name}]; // reference to the newly inserted parsed_id
+        if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Virus name: " << virus_name << '\n';
+
+        parsed_id& pid = metadata[std::string{virus_name}];  // reference to the newly inserted parsed_id
         if (pid.isolate.empty())  // if isolate is not set, parse the id
         {
-            if constexpr (debugging)
-                seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
+            if constexpr (debugging >= debugging_WARNING)    seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
             parse_id(record.id(), pid);
         }
+        if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
         //for (auto & gene : genes)  
         std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
         {
+            if constexpr (debugging >= debugging_TRACE+3)    seqan3::debug_stream << "Trace before check_rec\n" ;
             target_count& tc = gene.check_rec(record);
+            if constexpr (debugging >= debugging_TRACE)      seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
             update_target_count(tc, pid);
         });
 
