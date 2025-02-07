@@ -613,7 +613,7 @@ target_count& SplitGene::check_rec(auto& record)
                    full_target.begin()+ref_end});
     
     if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
-    
+
     // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
     try 
     {
@@ -684,9 +684,9 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_ta
                                                                      << " wih initial pattern " << pq.pattern <<'\n'  ;
 
     int pr_beg = primer.ref_beg + offset ; //   pr_end = primer.ref_end + offset;
- 
+    
     for (int i = 0; i < primer.len; ++i)
-    {
+    { 
         // get the target nt at the position i taking into consideration the primer is forward or reverse
         seqan3::dna15 t{primer.reverse ? full_target[pr_beg - i].complement() 
                                        : full_target[pr_beg + i]};
@@ -792,18 +792,19 @@ void SplitGene::write_grouped ()
     std::string patterns, id;
     patterns.reserve(4000);
     id.reserve(4000);
+    // count and logg ignored sequences due to too many Ns and to empty patterns
+    long many_N = 0, empty_patterns = 0;
 
     for (sgr_p           sg :  gr_v            )   // pointers to msa_grouped target_count   seq: target_count
     {
-                
-
         target_count & target_c = sg->second;
+
         // discard sequences with too many N.
         if (std::all_of(target_c.target.patterns.begin(), target_c.target.patterns.end(), 
-                        [&](pattern_q &pq) {return pq.N > parent.crit_N;})) 
-            return;
+                        [&](pattern_q &pq) {return pq.N > parent.crit_N;}))        { many_N++; continue;}
+
         build_id_field_patterns(target_c, patterns);
-        if (patterns.empty()) continue;
+        if (patterns.empty())                                    {empty_patterns++; continue;}
 
         for (auto& [year,      yc]:  sg->second.years) 
         for (auto& [month,     mc]:  yc.months       ) {
@@ -845,6 +846,9 @@ void SplitGene::write_grouped ()
         // output to ".grouped" file_e_gr
         file_e_gr.push_back<record_t>( record_t{sg->first, std::to_string(sg->second.count) + id} );
     }
+    // logg ignored sequences due to too many Ns and to empty patterns
+    if constexpr (debugging >= debugging_INFO) 
+        seqan3::debug_stream << name << ": Ignored sequences due to too many Ns: " << many_N << " and to empty patterns: " << empty_patterns << '\n';
 }
 
 void SplitGene::write_msa_grouped ()
