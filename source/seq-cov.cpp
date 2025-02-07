@@ -683,12 +683,15 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_ta
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq 
                                                                      << " wih initial pattern " << pq.pattern <<'\n'  ;
 
-    int pr_beg = primer.ref_beg + offset;
+    int pr_beg = primer.ref_beg + offset ; //   pr_end = primer.ref_end + offset;
  
     for (int i = 0; i < primer.len; ++i)
     {
-        auto t = full_target[pr_beg + i];
-        if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "Checking position " << i << ": " << primer.seq[i] << " vs " << t << '\n';
+        // get the target nt at the position i taking into consideration the primer is forward or reverse
+        seqan3::dna15 t{primer.reverse ? full_target[pr_beg - i].complement() 
+                                       : full_target[pr_beg + i]};
+
+        if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Checking position " << i << ": " << primer.seq[i] << " vs " << t << '\n';
         if (!mismatch.score(primer.seq[i], t))   continue;
         if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Mismatch found " << '\n';
 
