@@ -615,6 +615,8 @@ target_count& SplitGene::check_rec(auto& record)
     if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
     
     // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
+    try 
+    {
     SeqPos sg = find_ampl_pos(full_target);
     
     if constexpr (debugging >= debugging_TRACE)    seqan3::debug_stream << "\nFound the amplicon position: " << sg.beg << " to " << sg.end << "\n";
@@ -637,6 +639,13 @@ target_count& SplitGene::check_rec(auto& record)
 
         target_c.count++;
         return target_c;
+    }
+    if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found"  
+          << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
+    } catch (std::exception & e) 
+    {
+        if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
+          << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
     
     return target_c;   
