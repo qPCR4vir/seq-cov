@@ -1445,11 +1445,30 @@ GISAID_format SplitCoVfasta::check_format()
 
 void SplitCoVfasta::split( )
 {
+    // use chrono to logg the time reading metadata and splitting
+    auto start = std::chrono::high_resolution_clock::now();
     check_format();
     read_metadata();      // fill metadata map keyed by Virus name
+    // take time
+    auto stop_metadata = std::chrono::high_resolution_clock::now(); 
     if (format == GISAID_format::fasta) 
-        return split_fasta();
-    return split_msa();
+        split_fasta();
+    else split_msa();
+    // take time and logg in hours, minutes, seconds
+    auto stop_split = std::chrono::high_resolution_clock::now();
+    
+    // logg in hours, minutes, seconds: hh:mm:ss format
+    auto duration_metadata = std::chrono::duration_cast<std::chrono::seconds>(stop_metadata - start);
+    auto duration_split    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - stop_metadata);
+    auto duration_total    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - start);
+    if constexpr (debugging >= debugging_INFO)
+        seqan3::debug_stream << "Reading etadata: " << duration_metadata.count() / 3600 << ':' 
+                             << (duration_metadata.count() % 3600) / 60 << ':' 
+                             << duration_metadata.count() % 60 << '\n';
+    if constexpr (debugging >= debugging_INFO)
+        seqan3::debug_stream << "Split all sequences: " << duration_split.count() / 3600 << ':' 
+                             << (duration_split.count() % 3600) / 60 << ':' 
+                             << duration_split.count() % 60 << '\n';
 }
 
 void SplitCoVfasta::split_fasta( )
