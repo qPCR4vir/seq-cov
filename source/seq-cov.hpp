@@ -190,15 +190,15 @@ class SplitCoVfasta;
  *             and try inverted too) 
  *     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
  */
-struct SplitGene
+struct PCRSplitter
 {
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; ///< Scoring scheme for mismatches (default is hamming distance)
 
-    SplitCoVfasta &   parent;           ///< Parent SplitCoVfasta instance
-    const std::string gene;             ///< PCR name
+    SplitCoVfasta &   parent;             ///< Parent SplitCoVfasta instance
+    const std::string pcr_name;           ///< PCR name
 
-    SplitGene( SplitCoVfasta &parent,   ///< Parent SplitCoVfasta instance
-               std::string   gene       ///< PCR name
+    PCRSplitter( SplitCoVfasta &parent,   ///< Parent SplitCoVfasta instance
+                std::string   pcr_name    ///< PCR name
              );
     
     std::vector<oligo>   f_primers,   ///< Forward primers for this PCR
@@ -362,7 +362,7 @@ class SplitCoVfasta
     std::vector<int>      msa_pos;   ///< MSA positions
 
  private:
-    std::vector<SplitGene> genes;    ///< Container for PCR-specific information
+    std::vector<PCRSplitter> pcrs;   ///< Container for PCR-specific information
 
     Metadata               metadata;                  ///< Mapping of isolate names to parsed metadata
     std::ifstream          open_metadata() const;     ///< Opens the metadata file
@@ -385,12 +385,12 @@ class SplitCoVfasta
 
     /// Adds a PCR entry and reads its oligo definitions
     void add_gene(const std::filesystem::path& oligos,    ///< Path to the oligos file
-                                   std::string gene,      ///< PCR name
+                                   std::string pcr_name,  ///< PCR name
                                    std::string fw = "",   ///< Optional forward primer override
                                    std::string rv = ""    ///< Optional reverse primer override
                                 )
     {
-        genes.emplace_back(*this, gene).read_oligos(oligos);
+        pcrs.emplace_back(*this, pcr_name).read_oligos(oligos);
     }
 
     GISAID_format check_format();  ///< Checks the format of the input FASTA file: MSA or raw sequences

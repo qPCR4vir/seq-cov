@@ -46,7 +46,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 };
 */
 
- bool SplitGene::quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
+ bool PCRSplitter::quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
  {
     int pr_beg = primer.ref_beg + offset;
     int len = primer.seq.size();
@@ -62,7 +62,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-SplitGene::SplitGene(SplitCoVfasta &parent, std::string gene)
+PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string gene)
         : parent{parent}, gene{gene}
 {
     
@@ -74,7 +74,7 @@ SplitGene::SplitGene(SplitCoVfasta &parent, std::string gene)
     
 }
 
-bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
+bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
 {
         if (path_oligos.empty()) return false;   // todo: more checks?
 
@@ -167,7 +167,7 @@ bool SplitGene::read_oligos(const std::filesystem::path& path_oligos)
 }
 
 // eliminate gaps and put the sequencce into the oligo_seq_t seq
-bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
+bool PCRSplitter::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& seq, long msa_beg, long msa_end, int tent_len)
 {
     if constexpr (debugging >= debugging_TRACE+3) 
                 seqan3::debug_stream << "\nReconstructing sequence from MSA positions " << msa_beg << " to " << msa_end << '\n';
@@ -197,7 +197,7 @@ bool SplitGene::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t& 
 }
 
 // find both external primers in the sequence target and return the position of the amplicon
-SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
+SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
 {
     // new, unknown seq. We need to find the right position of the target sequence
     // less than 1% of the seq. May be around 50k?
@@ -277,7 +277,7 @@ SeqPos SplitGene::find_ampl_pos(const oligo_seq_t& target)
     return sg;
 }
 
-void SplitGene::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align the oligo to an exact target and build primer match pattern on oligo_target
+void PCRSplitter::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align the oligo to an exact target and build primer match pattern on oligo_target
 {
     if constexpr (debugging >= debugging_TRACE) 
         seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ":\n" 
@@ -410,7 +410,7 @@ void SplitGene::re_align(pattern_q &pq, oligo_seq_t &oligo_target)  // re_align 
                          << oligo_target  << " - unaligned target\n" ;
 }
 
-void SplitGene::align_to_msa(pattern_q &pq,      ///< oligo_pattern_quality  // build primer match pattern on oligo_target on to the expected MSA position. - not used !!
+void PCRSplitter::align_to_msa(pattern_q &pq,      ///< oligo_pattern_quality  // build primer match pattern on oligo_target on to the expected MSA position. - not used !!
                     const msa_seq_t &full_target)
 {
     oligo_seq_t oligo_target;
@@ -477,7 +477,7 @@ void SplitGene::align_to_msa(pattern_q &pq,      ///< oligo_pattern_quality  // 
  
 }
 
-void SplitGene::target_msa_pattern(target_q & tq, const msa_seq_t& full_target) // build target match pattern on ref on to the expected MSA positions msa_beg, msa_end.
+void PCRSplitter::target_msa_pattern(target_q & tq, const msa_seq_t& full_target) // build target match pattern on ref on to the expected MSA positions msa_beg, msa_end.
 {
     // msa_seq_t& full_target is already aligned to the reference sequence: just create the target pattern
     tq.target_pattern.clear();
@@ -505,7 +505,7 @@ void SplitGene::target_msa_pattern(target_q & tq, const msa_seq_t& full_target) 
     }
 }
 
-void SplitGene::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
+void PCRSplitter::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
 {
     for (oligo& primer : all_oligos)   
     {
@@ -527,7 +527,7 @@ void SplitGene::evaluate_msa_target(target_q & tq, const msa_seq_t& full_target)
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  }
 
-void SplitGene::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& full_target) // build primer match pattern on full_target on to the expected MSA positions msa_beg, msa_end of the primer.
+void PCRSplitter::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& full_target) // build primer match pattern on full_target on to the expected MSA positions msa_beg, msa_end of the primer.
 {
     cov::oligo &primer = pq.primer;
     oligo_seq_t oligo_target;
@@ -577,7 +577,7 @@ void SplitGene::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& full_
 //             if fails use the whole sequence, 
 //             and try inverted too) 
 //     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
-target_count& SplitGene::check_rec(auto& record)
+target_count& PCRSplitter::check_rec(auto& record)
 {
     oligo_seq_t& full_target = record.sequence();
     count++;
@@ -651,7 +651,7 @@ target_count& SplitGene::check_rec(auto& record)
     return target_c;   
 }
 
-void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
+void PCRSplitter::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
 {
     int offset = ampl_beg - ref_beg;
     for (oligo& primer : all_oligos)   
@@ -676,7 +676,7 @@ void SplitGene::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, l
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
  }
 
-void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long offset) // build primer match pattern on full_target at positions beg
+void PCRSplitter::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_target, long offset) // build primer match pattern on full_target at positions beg
 {
     cov::oligo &primer = pq.primer;
     pq.pattern = std::string(primer.len, '.');
@@ -714,7 +714,7 @@ void SplitGene::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_ta
                              << "Q = " << pq.Q << ", Missatches: " << pq.mm << ", Ns: " << pq.N << ", crit: " << pq.crit << '\n';
 }
 
-void SplitGene::target_pattern(target_q & tq, const oligo_seq_t &full_target, long ampl_beg)// build target match pattern on ref at ampl_beg
+void PCRSplitter::target_pattern(target_q & tq, const oligo_seq_t &full_target, long ampl_beg)// build target match pattern on ref at ampl_beg
 {
     // already aligned to the reference sequence: just create the target pattern
     tq.target_pattern = std::string(ref_len, '.');
@@ -729,7 +729,7 @@ void SplitGene::target_pattern(target_q & tq, const oligo_seq_t &full_target, lo
 }
 
 // sequences pre-aligned into the MSA to the reference sequence
-target_count& SplitGene::check_msa_rec(auto& record)
+target_count& PCRSplitter::check_msa_rec(auto& record)
 {
     msa_seq_t& full_target = record.sequence();
     count++;
@@ -755,7 +755,7 @@ void build_id_field_patterns(target_count & target_c, std::string & patterns)
         patterns += "|" + target_c.target.target_pattern + "|" ;  // at the end we will add the count    
 }
 
-void SplitGene::write_grouped ()
+void PCRSplitter::write_grouped ()
 {
     using types    = seqan3::type_list<oligo_seq_t, std::string>;
     using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
@@ -851,7 +851,7 @@ void SplitGene::write_grouped ()
         seqan3::debug_stream << name << ": Ignored sequences due to too many Ns: " << many_N << " and to empty patterns: " << empty_patterns << '\n';
 }
 
-void SplitGene::write_msa_grouped ()
+void PCRSplitter::write_msa_grouped ()
 {
     using types    = seqan3::type_list<msa_seq_t, std::string>;
     using fields   = seqan3::fields<seqan3::field::seq, seqan3::field::id>;
@@ -1025,8 +1025,8 @@ void SplitCoVfasta::set_msa_ref_pos( )
 
     seqan3::debug_stream << "\n\nMSA Reference: " << ref_rec.id() << ",\t MSA lenth = " << msa_len << ", reference lenth = " << ref_seq.size() << '\n';
     
-    // for (auto & gene : genes) gene.set_msa_ref_pos(); Set/Check correct positions of primers on the reference sequence
-    for (auto & gene : genes) 
+    // for (auto & gene : pcrs) gene.set_msa_ref_pos(); Set/Check correct positions of primers on the reference sequence
+    for (auto & gene : pcrs) 
     {
         // set gene target positions, First check ref_beg and ref_end were alrready set (in read_oligos)
         if (gene.ref_beg == gene.ref_end) // run time error if not set
@@ -1498,8 +1498,8 @@ void SplitCoVfasta::split_fasta( )
         }
         if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
-        //for (auto & gene : genes)  
-        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        //for (auto & gene : pcrs)  
+        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& gene) 
         {
             if constexpr (debugging >= debugging_TRACE+3)    seqan3::debug_stream << "Trace before check_rec\n" ;
             target_count& tc = gene.check_rec(record);
@@ -1512,15 +1512,15 @@ void SplitCoVfasta::split_fasta( )
             // seqan3::debug_stream << '.' ;
         
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
-            for (auto & gene : genes)
+            for (auto & gene : pcrs)
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.grouped.size() << "\n" ; 
         }
-        if (t>7000) break;
+        if (t>1000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
-    for (auto & gene : genes)                // write grouped sequences for each gene/target
+    for (auto & gene : pcrs)                // write grouped sequences for each gene/target
     {
         seqan3::debug_stream << gene.gene <<"= " << gene.count 
                              << ". Grouped: "    << gene.grouped.size() << ". " ; 
@@ -1556,8 +1556,8 @@ void SplitCoVfasta::split_msa( )
             parse_id_allnuc(record.id(), pid);
         }
 
-        //for (auto & gene : genes)   
-        std::for_each(std::execution::par_unseq, genes.begin(), genes.end(), [&](auto& gene) 
+        //for (auto & gene : pcrs)   
+        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& gene) 
         {
             target_count& tc = gene.check_msa_rec(record);
             update_target_count(tc, pid);
@@ -1568,7 +1568,7 @@ void SplitCoVfasta::split_msa( )
             // seqan3::debug_stream << '.' ;
         
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
-            for (auto & gene : genes)
+            for (auto & gene : pcrs)
                 seqan3::debug_stream << gene.gene <<"= " << gene.count 
                                      << ". Grouped: "    << gene.msa_grouped.size() << "\n" ; 
         }
@@ -1576,7 +1576,7 @@ void SplitCoVfasta::split_msa( )
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
-    for (auto & gene : genes)                // write grouped sequences for each gene/target
+    for (auto & gene : pcrs)                // write grouped sequences for each gene/target
     {
         seqan3::debug_stream << gene.gene <<"= " << gene.count 
                              << ". Grouped: "    << gene.msa_grouped.size() << ". " ; 
