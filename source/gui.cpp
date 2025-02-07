@@ -37,7 +37,7 @@ GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
         auto Add_Gene = [&sp](auto &g)
         {
         if (!g.forw.text().empty() && !g.rev.text().empty())
-            sp.add_gene(g.input_file.text(),
+            sp.add_pcr(g.input_file.text(),
                         g.gene.text(),     
                         g.forw.text(),     g.rev.text());
         };

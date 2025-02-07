@@ -62,15 +62,15 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string gene)
-        : parent{parent}, gene{gene}
+PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string pcr_name)
+        : parent{parent}, pcr_name{pcr_name}
 {
     
     //if (split) file_E.open( );  // todo implement conditional split
     std::cout << std::boolalpha  
         << "\nGoing to split: " << (parent.dir / parent.fasta_name).string() 
-        << ", gene " << gene << " into "
-        << (parent.dir / (gene + "." + parent.fasta_name)).string();
+        << ", PCR " << pcr_name << " into "
+        << (parent.dir / (pcr_name + "." + parent.fasta_name)).string();
     
 }
 
@@ -114,7 +114,7 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
             if constexpr (debugging) 
                 seqan3::debug_stream << " with minimum matches:" << pr.match;
 
-            // update this gene-amplicon
+            // update this PCR-amplicon
             if (pr.ref_beg < pr.ref_end)   
             {
                 pr.reverse = false;
@@ -236,14 +236,14 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
             return sg; // only find fw pr pos. Don't count for insertions/deletions or bad rev.
         }
         else if (sg.beg < 0)
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
+            throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
             "the full forward primer. Score: " + std::to_string(res.score()) +
             " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
     }
     else 
     {
         if (!ref_len)
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
+            throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
                                         "the forward primer. Score: " + std::to_string(res.score() )};
         else
             sg.beg = sg.end = 0;  // mark as not found !!
@@ -263,13 +263,13 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
         if (ref_len) 
             sg.beg = sg.end - ref_len;
         else if (sg.end > target.size())
-            throw std::runtime_error{"First " + gene + " sequence don't contain "
+            throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
             "the full reverse primer. Score: " + std::to_string(res.score()) +
             " that end at position "  + std::to_string(res.sequence2_end_position())  };
         return sg;
     }
 
-    if (!ref_len) throw std::runtime_error{"First " + gene + " sequence don't contain "
+    if (!ref_len) throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
                                         "the reverse primer. Score: " + std::to_string(res.score() )};
     sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
     // todo  align with ref_seq
@@ -764,7 +764,7 @@ void PCRSplitter::write_grouped ()
     using sgr_p    = sgr_t*;
     using fasta_out= seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >;
 
-       auto name = parent.fasta_name + "." + gene;
+       auto name = parent.fasta_name + "." + pcr_name;
 
        std::filesystem::path gr  = parent.dir / (name + ".grouped.fasta" );
 
@@ -860,7 +860,7 @@ void PCRSplitter::write_msa_grouped ()
     using sgr_p    = sgr_t*;
     using fasta_out= seqan3::sequence_file_output<fields, seqan3::type_list<seqan3::format_fasta> >;
 
-       auto name = parent.fasta_name + "." + gene;
+       auto name = parent.fasta_name + "." + pcr_name;
 
        std::filesystem::path gr  = parent.dir / (name + ".grouped.fasta" );
 
@@ -1025,18 +1025,18 @@ void SplitCoVfasta::set_msa_ref_pos( )
 
     seqan3::debug_stream << "\n\nMSA Reference: " << ref_rec.id() << ",\t MSA lenth = " << msa_len << ", reference lenth = " << ref_seq.size() << '\n';
     
-    // for (auto & gene : pcrs) gene.set_msa_ref_pos(); Set/Check correct positions of primers on the reference sequence
-    for (auto & gene : pcrs) 
+    // for (auto & pcr : pcrs) pcr.set_msa_ref_pos(); Set/Check correct positions of primers on the reference sequence
+    for (auto & pcr : pcrs) 
     {
-        // set gene target positions, First check ref_beg and ref_end were alrready set (in read_oligos)
-        if (gene.ref_beg == gene.ref_end) // run time error if not set
-            throw std::runtime_error{"Primer " + gene.gene + " has no reference positions set"};
-        gene.msa_beg = msa_pos[gene.ref_beg-1];
-        gene.msa_end = msa_pos[gene.ref_end-1];
-        gene.msa_len = gene.msa_end - gene.msa_beg + 1;
+        // set PCR target positions, first check ref_beg and ref_end were alrready set (in read_oligos)
+        if (pcr.ref_beg == pcr.ref_end) // run time error if not set
+            throw std::runtime_error{"PCR " + pcr.pcr_name + " has no reference positions set"};
+        pcr.msa_beg = msa_pos[pcr.ref_beg-1];
+        pcr.msa_end = msa_pos[pcr.ref_end-1];
+        pcr.msa_len = pcr.msa_end - pcr.msa_beg + 1;
         
         // check all primers
-        for (auto & primer : gene.all_oligos)
+        for (auto & primer : pcr.all_oligos)
         {
             if (primer.ref_beg == primer.ref_end) // run time error if not set
                 throw std::runtime_error{"Primer " + primer.name + " has no reference positions set"};
@@ -1478,7 +1478,7 @@ void SplitCoVfasta::split_fasta( )
     // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<OLIGO> file_in{fasta};
 
-    long t{0L}, m{(1L<<18)-1};  // for progress printing
+    long t{0L}, m{(1L<<16)-1};  // for progress printing
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
     for (auto && record : file_in)             // read each sequence in the file
@@ -1498,11 +1498,11 @@ void SplitCoVfasta::split_fasta( )
         }
         if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
-        //for (auto & gene : pcrs)  
-        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& gene) 
+        //for (auto & pcr : pcrs)  
+        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& pcr) 
         {
             if constexpr (debugging >= debugging_TRACE+3)    seqan3::debug_stream << "Trace before check_rec\n" ;
-            target_count& tc = gene.check_rec(record);
+            target_count& tc = pcr.check_rec(record);
             if constexpr (debugging >= debugging_TRACE)      seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
             update_target_count(tc, pid);
         });
@@ -1512,19 +1512,19 @@ void SplitCoVfasta::split_fasta( )
             // seqan3::debug_stream << '.' ;
         
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
-            for (auto & gene : pcrs)
-                seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                     << ". Grouped: "    << gene.grouped.size() << "\n" ; 
+            for (auto & pcr : pcrs)
+                seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
+                                     << ". Grouped: "    << pcr.grouped.size() << "\n" ; 
         }
         if (t>1000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
-    for (auto & gene : pcrs)                // write grouped sequences for each gene/target
+    for (auto & pcr : pcrs)                // write grouped sequences for each PCR/target
     {
-        seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                             << ". Grouped: "    << gene.grouped.size() << ". " ; 
-        gene.write_grouped();
+        seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
+                             << ". Grouped: "    << pcr.grouped.size() << ". " ; 
+        pcr.write_grouped();
     }
 
 }
@@ -1556,10 +1556,10 @@ void SplitCoVfasta::split_msa( )
             parse_id_allnuc(record.id(), pid);
         }
 
-        //for (auto & gene : pcrs)   
-        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& gene) 
+        //for (auto & pcr : pcrs)   
+        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& pcr) 
         {
-            target_count& tc = gene.check_msa_rec(record);
+            target_count& tc = pcr.check_msa_rec(record);
             update_target_count(tc, pid);
         });
 
@@ -1568,19 +1568,19 @@ void SplitCoVfasta::split_msa( )
             // seqan3::debug_stream << '.' ;
         
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
-            for (auto & gene : pcrs)
-                seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                                     << ". Grouped: "    << gene.msa_grouped.size() << "\n" ; 
+            for (auto & pcr : pcrs)
+                seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
+                                     << ". Grouped: "    << pcr.msa_grouped.size() << "\n" ; 
         }
         if (t>7000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
-    for (auto & gene : pcrs)                // write grouped sequences for each gene/target
+    for (auto & pcr : pcrs)                // write grouped sequences for each PCR/target
     {
-        seqan3::debug_stream << gene.gene <<"= " << gene.count 
-                             << ". Grouped: "    << gene.msa_grouped.size() << ". " ; 
-        gene.write_msa_grouped();
+        seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
+                             << ". Grouped: "    << pcr.msa_grouped.size() << ". " ; 
+        pcr.write_msa_grouped();
     }
 
 }

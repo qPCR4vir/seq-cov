@@ -384,7 +384,7 @@ class SplitCoVfasta
     {}
 
     /// Adds a PCR entry and reads its oligo definitions
-    void add_gene(const std::filesystem::path& oligos,    ///< Path to the oligos file
+    void add_pcr(const std::filesystem::path& oligos,    ///< Path to the oligos file
                                    std::string pcr_name,  ///< PCR name
                                    std::string fw = "",   ///< Optional forward primer override
                                    std::string rv = ""    ///< Optional reverse primer override
@@ -411,6 +411,7 @@ class SplitCoVfasta
     void update_target_count(target_count& tc,       ///< Target count to update
                              parsed_id& pid          ///< Parsed metadata structure
                             );  
+
 
     void split_msa( );         ///< Splits sequences based on MSA data
     void split_fasta( );       ///< Splits the FASTA sequences into groups
