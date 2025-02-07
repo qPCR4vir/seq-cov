@@ -398,23 +398,19 @@ class SplitCoVfasta
     void split();                  ///< Splits the input file into grouped PCR targets  
 
     /// Extracts a fragment from an MSA and reconstructs a nucleotide sequence
-    bool extract_msa_seq(const msa_seq_t &full_msa_seq,            ///< Full MSA sequence, including the gaps that make the alignment
-                               msa_seq_t &msa_fragment, 
-                             oligo_seq_t &reconstructed_seq,
-                        long msa_beg, long msa_end, int tent_len = 0) ;
+    bool extract_msa_seq(const msa_seq_t &full_msa_seq,              ///< Full MSA sequence, including the gaps that make the alignment
+                               msa_seq_t &msa_fragment,              ///< Output MSA fragment
+                             oligo_seq_t &reconstructed_seq,         ///< Output reconstructed nucleotide sequence
+                                    long msa_beg,                    ///< MSA beginning position
+                                    long msa_end,                    ///< MSA ending position
+                                    int tent_len = 0                 ///< Tentative length for sequence reservation
+                       ) ;
     
-    
-    ///< @param msa_fragment: Output MSA fragment
-    ///< @param reconstructed_seq: Output reconstructed nucleotide sequence
-    ///< @param msa_beg: MSA beginning position
-    ///< @param msa_end: MSA ending position
-    ///< @param tent_len: Tentative length for sequence reservation
-
  private:
-    void update_target_count(target_count& tc, parsed_id& pid);  
-    ///< Updates a target count using parsed metadata
-    ///< @param tc: Target count to update
-    ///< @param pid: Parsed metadata structure
+    /// Updates a target count using parsed metadata
+    void update_target_count(target_count& tc,       ///< Target count to update
+                             parsed_id& pid          ///< Parsed metadata structure
+                            );  
 
     void split_msa( );         ///< Splits sequences based on MSA data
     void split_fasta( );       ///< Splits the FASTA sequences into groups
