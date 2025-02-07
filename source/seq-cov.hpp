@@ -1,3 +1,6 @@
+
+// file seq_cov.hpp
+
 #pragma once
 
 #include <string>
@@ -214,7 +217,19 @@ struct SplitGene
     bool quick_check(const oligo_seq_t &target, const oligo &primer, long offset); // check if the primer matches the target at the expected position
 };    
 
-
+/// Given a GISAID fasta file, split it into detally evaluated PCR targets defined by a set of oligos from another small fasta file.
+///
+/// There are pver 17 000 000 SARS-CoV-2 sequences in GISAID database, and the number is growing.
+/// Our goal is to make this information more manejable reducing it to a few hundred thousand of fasta sequences 
+/// where each item reprecent a group of identical sequences of the amplicon for that PCR tardet. 
+/// Additional splitting of that grouping will be saved into different files.each grouping sequences additionaly by
+/// year, month, day, continent, country and clade. 
+/// The id or description of each resulting fasta item specify in a defined format the number of original isolates 
+/// grouped in that item followed representative metadata includin an EPI_ISL isoloate name, country, region, clade, pango lineage, etc.
+/// It also include a detailed evaluation of the PCR target sequence, including the number of mismatches, Ns, gaps, and critical mismatches
+/// for each primer 
+///  
+/// Objects 
 class SplitCoVfasta
 {
  public:
@@ -240,7 +255,8 @@ class SplitCoVfasta
     Metadata               metadata;
     std::ifstream          open_metadata() const;
     std::unordered_map<std::string, size_t>  parse_metadata_header(std::ifstream &metadata_file);
-    // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
+    
+    /// extract isolate name from virus_name like "BTC-4694" from "hCoV-19/United Arab Emirates/BTC-4694/2021"
     static std::string_view isolate(const std::string_view virus_name);
 
  public:
@@ -253,7 +269,7 @@ class SplitCoVfasta
     {}
 
     void add_gene(const std::filesystem::path& oligos, std::string gene, 
-                     std::string fw="", std::string rv="")  // todo implement conditional split
+                     std::string fw="", std::string rv="")  ///< todo: implement conditional split
     {
         genes.emplace_back(*this, gene).read_oligos(oligos);
     }
@@ -271,8 +287,8 @@ class SplitCoVfasta
     void set_ref_pos();
     void set_msa_ref_pos();
 
-    void parse_id_allnuc(const std::string& id, parsed_id& pid);  // deprecated
-    void parse_id       (const std::string& id, parsed_id& pid);  // deprecated
+    void parse_id_allnuc(const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
+    void parse_id       (const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
 
     void read_metadata();
     
