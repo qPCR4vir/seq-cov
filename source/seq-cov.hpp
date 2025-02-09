@@ -246,7 +246,7 @@ struct PCRSplitter
 
     /// Processes a raw record and returns a reference to a target_count keep in the grouped map
     std::optional<std::reference_wrapper<target_count>> check_rec   (const auto & record   ///< non-MSA record to process
-                               );
+                                              );
 
     /// Finds the amplicon positions in the target sequence
     SeqPos find_ampl_pos(const oligo_seq_t & target   ///< The nucleotide sequence of the target
