@@ -35,7 +35,10 @@ enum {  debugging_NOT_USED= 0,
         debugging_DEBUG   = 40, 
         debugging_TRACE   = 80,
         debugging_ALL     = 1000};
-constexpr auto debugging = debugging_ALL;  // How much debug info to print
+constexpr auto debugging   = debugging_DEBUG;  // How much debug info to print todo: move to .cpp?
+constexpr auto break_by    =  debugging_INFO;
+constexpr long break_point =  170000;
+
 // todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
 
 namespace cov

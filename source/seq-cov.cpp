@@ -13,7 +13,6 @@
 #include <execution>
 #include <chrono>
 
-	
 // #include <seqan3/std/ranges>                    // include all of the standard library's views
 #include <seqan3/alphabet/all.hpp>
 // #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
@@ -680,8 +679,7 @@ void PCRSplitter::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_
 {
     cov::oligo &primer = pq.primer;
     pq.pattern = std::string(primer.len, '.');
-    if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq 
-                                                                     << " wih initial pattern " << pq.pattern <<'\n'  ;
+    if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq <<'\n'  ;
 
     int pr_beg = primer.ref_beg + offset ; //   pr_end = primer.ref_end + offset;
     
@@ -1460,9 +1458,8 @@ void SplitCoVfasta::split( )
     // logg in hours, minutes, seconds: hh:mm:ss format
     auto duration_metadata = std::chrono::duration_cast<std::chrono::seconds>(stop_metadata - start);
     auto duration_split    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - stop_metadata);
-    auto duration_total    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - start);
     if constexpr (debugging >= debugging_INFO)
-        seqan3::debug_stream << "Reading etadata: " << duration_metadata.count() / 3600 << ':' 
+        seqan3::debug_stream << "Reading metadata: " << duration_metadata.count() / 3600 << ':' 
                              << (duration_metadata.count() % 3600) / 60 << ':' 
                              << duration_metadata.count() % 60 << '\n';
     if constexpr (debugging >= debugging_INFO)
@@ -1473,27 +1470,27 @@ void SplitCoVfasta::split( )
 
 void SplitCoVfasta::split_fasta( )
 {
-    set_ref_pos();    // load the reference sequence
+    set_ref_pos();                                        // load the reference sequence
  
-    // Initialise a file input object with a FASTA file.
-    seqan3::sequence_file_input<OLIGO> file_in{fasta};
+    seqan3::sequence_file_input<OLIGO> file_in{fasta};    // Initialise a file input object with a FASTA file.
 
-    long t{0L}, m{(1L<<16)-1};  // for progress printing
+    long t{0L}, m{(1L<<12)-1};                            // for progress printing
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
-    for (auto && record : file_in)             // read each sequence in the file
+    for (auto && record : file_in)                        // read each sequence in the file sequencially !!
     {
-        if constexpr (debugging >= debugging_TRACE)          seqan3::debug_stream << "\n" << record.id() << '\n' ;
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
         std::string_view virus_name = record.id();
         virus_name = virus_name.substr(0, virus_name.find('|'));
 
-        if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Virus name: " << virus_name << '\n';
+        if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Virus name: " << virus_name << '\n';
 
-        parsed_id& pid = metadata[std::string{virus_name}];  // reference to the newly inserted parsed_id
-        if (pid.isolate.empty())  // if isolate is not set, parse the id
+        parsed_id& pid = metadata[std::string{virus_name}];  // reference to the (posibly newly inserted) parsed_id
+
+        if (pid.isolate.empty())                             // if isolate is not set, parse the id
         {
-            if constexpr (debugging >= debugging_WARNING)    seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
+            if constexpr (debugging >= debugging_WARNING) seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
             parse_id(record.id(), pid);
         }
         if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
@@ -1507,16 +1504,14 @@ void SplitCoVfasta::split_fasta( )
             update_target_count(tc, pid);
         });
 
-        if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
+        if (!(++t & m))                                              // progress indication every 2^18 (m) sequences 
         {
-            // seqan3::debug_stream << '.' ;
-        
             seqan3::debug_stream << "\tT= " << t  << "\n" ;
             for (auto & pcr : pcrs)
                 seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
                                      << ". Grouped: "    << pcr.grouped.size() << "\n" ; 
         }
-        if (t>1000) break;
+        if constexpr (debugging >= break_by) if (t>=break_point) break;     // set for debugging only  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
