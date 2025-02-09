@@ -195,6 +195,27 @@ bool PCRSplitter::reconstruct_msa_seq(const msa_seq_t& full_msa_seq, oligo_seq_t
     return true;
 }
 
+long find_primer(const oligo_seq_t& target, const oligo& primer, auto& config)
+{
+    auto results = seqan3::align_pairwise(std::tie(target, primer.seq), config);
+    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "check if there are results" << '\n';
+ 
+    auto res_beg = results.begin();
+    if (res_beg == results.end())    return -1;
+    
+    auto & res = *res_beg;
+    if constexpr (debugging >= debugging_TRACE+3) 
+    {seqan3::debug_stream << "Alignment: " << res.alignment() << " Score: "     << res.score() ;
+    seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+    seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
+    
+    if (res.score() < primer.match)    return -1;
+    
+    return res.sequence1_begin_position() - res.sequence2_begin_position() ;  // target begin position - primer begin position
+    
+} 
+
+
 // find both external primers in the sequence target and return the position of the amplicon
 SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
 {
