@@ -1536,6 +1536,14 @@ void SplitCoVfasta::split_fasta( )
         seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
                              << ". Grouped: "    << pcr.grouped.size() << ". " ; 
         pcr.write_grouped();
+        // by debugging level print the amplicon_pos_beg (map of positiion: count) in descending order of counts (values)
+        if constexpr (debugging >= debugging_INFO)
+        {
+            //std::multimap<int, int, std::greater<>> inverted{pcr.amplicon_pos_beg.begin(), pcr.amplicon_pos_beg.end()};
+            seqan3::debug_stream << "Amplicon_reference pos beg: " << pcr.ref_beg << '\n'; 
+            for (auto& [pos, count] : pcr.amplicon_pos_beg)
+                seqan3::debug_stream << "pos: " << pos << ", count: " << count << '\n';
+        }
     }
 
 }
@@ -1592,6 +1600,15 @@ void SplitCoVfasta::split_msa( )
         seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
                              << ". Grouped: "    << pcr.msa_grouped.size() << ". " ; 
         pcr.write_msa_grouped();
+        // by debugging level print the amplicon_pos_beg (map of positiion: count) in descending order of counts (values)
+        if constexpr (debugging >= debugging_INFO)
+        {
+            std::multimap<int, int, std::greater<>> inverted{pcr.amplicon_pos_beg.begin(), pcr.amplicon_pos_beg.end()};
+            for (auto& [pos, count] : inverted)
+                seqan3::debug_stream << "pos: " << pos << ", count: " << count << '\n';
+        }
+
+
     }
 
 }
