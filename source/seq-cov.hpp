@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <ranges>
+#include <optional>
 
 // // Define a fallback value for hardware_destructive_interference_size
 // #ifndef __cpp_lib_hardware_interference_size
@@ -241,7 +242,7 @@ struct PCRSplitter
                                 );
 
     /// Processes a raw record and returns a reference to a target_count keep in the grouped map
-    target_count & check_rec   (auto & record         ///< non-MSA record to process
+    std::optional<std::reference_wrapper<target_count>> check_rec   (const auto & record   ///< non-MSA record to process
                                );
 
     /// Finds the amplicon positions in the target sequence

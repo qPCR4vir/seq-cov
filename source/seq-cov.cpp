@@ -576,78 +576,86 @@ void PCRSplitter::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& ful
 //             if fails use the whole sequence, 
 //             and try inverted too) 
 //     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
-target_count& PCRSplitter::check_rec(auto& record)
+std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const auto& record)
 {
-    oligo_seq_t& full_target = record.sequence();
+    const oligo_seq_t& full_target = record.sequence();
     count++;
-
-    target_count & target_c = grouped[{full_target.begin()+ref_beg, 
-                                       full_target.begin()+ref_end}]; 
-    if (target_c.count) 
-    { 
-        target_c.count++;
-        return target_c;  // 1-exact known position and sequence:
-    }
-    
-    // new target sequence
-    // debug-log goint to check the target sequence
-    if constexpr (debugging >= debugging_TRACE+3) 
-        seqan3::debug_stream << "\nChecking new target sequence: " << record.id() << " with " << full_target.size() 
-                             << " with extern_forw_idx " << extern_forw_idx << " primer of " << f_primers.size() <<  "\n";
-
-    if (quick_check(full_target, f_primers[extern_forw_idx], 0) )
+    if (full_target.size() > ref_end)
     {
+        const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+ref_beg, 
+                                                            full_target.begin()+ref_end}, target_count{});
+        target_count & target_c = it->second;
+        if (!is_new_seq) 
+        { 
+            target_c.count++;
+            if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[ref_beg]++;
+            return std::ref(target_c);  // 1-exact known position and sequence:
+        }
+        
+        // new target sequence
+        // debug-log goint to check the target sequence
         if constexpr (debugging >= debugging_TRACE+3) 
-            seqan3::debug_stream << "\nFound the forward primer at the expected position: " << f_primers[extern_forw_idx].name << "\n";
-        evaluate_target(target_c.target, full_target, ref_beg); // 2-right position but new sequence
-        target_c.count++;
-        return target_c;
-    }
-    // 3-New position:
-    
-    // discard wrong seq/target_c
-    if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarding wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
-    
-    grouped.erase({full_target.begin()+ref_beg, 
-                   full_target.begin()+ref_end});
-    
-    if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " << record.id() << " with " << full_target.size() << "\n";
+            seqan3::debug_stream << "\nChecking new target sequence: " << record.id() << " with " << full_target.size() 
+                                 << " with extern_forw_idx " << extern_forw_idx << " primer of " << f_primers.size() ;
 
+        if (quick_check(full_target, f_primers[extern_forw_idx], 0) )
+        {
+            if constexpr (debugging >= debugging_TRACE+3) 
+                seqan3::debug_stream << "\nFound the forward primer at the expected position: " << f_primers[extern_forw_idx].name << "\n";
+            evaluate_target(target_c.target, full_target, ref_beg); // 2-right position but new sequence
+            target_c.count++;
+            return std::ref(target_c);
+        }
+        // 3-New position:
+        
+        // discard wrong seq/target_c
+        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarding wrong sequence: "  ;
+        
+        grouped.erase(it);
+
+        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " ;
+    }
+    
     // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
     try 
     {
-    SeqPos sg = find_ampl_pos(full_target);
-    
-    if constexpr (debugging >= debugging_TRACE)    seqan3::debug_stream << "\nFound the amplicon position: " << sg.beg << " to " << sg.end << "\n";
-    
-    if (sg.beg < sg.end)  // found the right position
-    {
-        target_count & target_c = grouped[{full_target.begin()+sg.beg, 
-                                           full_target.begin()+sg.end}]; 
-        if (target_c.count) 
-        { 
-            target_c.count++;
-            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nFound the amplicon alrready: " << target_c.target.target_pattern << "\n";
-            return target_c;  // 3- known sequence but new position .  todo: register the new position !!!!! 
-        }
-        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Going to evaluate the target sequence" << '\n';
+        SeqPos sg = find_ampl_pos(full_target);
         
-        evaluate_target(target_c.target, full_target, sg.beg); // 3- new sequence in new position .  todo: register the new position !!!!! 
+        if constexpr (debugging >= debugging_TRACE)    seqan3::debug_stream << "\nFound the amplicon position: " << sg.beg << " to " << sg.end << "\n";
         
-        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Evaluated the target sequence" << '\n';
+        if (sg.beg < sg.end)  // found the right position
+        {
+            if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
 
-        target_c.count++;
-        return target_c;
-    }
-    if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found"  
-          << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
-    } catch (std::exception & e) 
+            const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
+                                                                full_target.begin()+sg.end}, target_count{});
+            target_count & target_c = it->second;
+            if (!is_new_seq)
+            { 
+                target_c.count++;
+                if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nFound the amplicon alrready: " << target_c.target.target_pattern << "\n";
+                
+                return std::ref(target_c);  // 3- known sequence but new position .  todo: register the new position !!!!! 
+            }
+            if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Going to evaluate the target sequence" ;
+            
+            evaluate_target(target_c.target, full_target, sg.beg); // 3- new sequence in new position .  todo: register the new position !!!!! 
+            
+            if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Evaluated the target sequence" << '\n';
+
+            target_c.count++;
+            return std::ref(target_c);
+        }
+        if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found"  
+            << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
+    } 
+    catch (std::exception & e) 
     {
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
           << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
     
-    return target_c;   
+    return std::nullopt;
 }
 
 void PCRSplitter::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
@@ -1460,18 +1468,18 @@ void SplitCoVfasta::split( )
     auto duration_split    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - stop_metadata);
     if constexpr (debugging >= debugging_INFO)
         seqan3::debug_stream << "Reading metadata: " << duration_metadata.count() / 3600 << ':' 
-                             << (duration_metadata.count() % 3600) / 60 << ':' 
-                             << duration_metadata.count() % 60 << '\n';
+                                                     << (duration_metadata.count() % 3600) / 60 << ':' 
+                                                     << duration_metadata.count() % 60 << '\n';
     if constexpr (debugging >= debugging_INFO)
         seqan3::debug_stream << "Split all sequences: " << duration_split.count() / 3600 << ':' 
-                             << (duration_split.count() % 3600) / 60 << ':' 
-                             << duration_split.count() % 60 << '\n';
+                                                        << (duration_split.count() % 3600) / 60 << ':' 
+                                                         << duration_split.count() % 60 << '\n';
 }
 
 void SplitCoVfasta::split_fasta( )
 {
     set_ref_pos();                                        // load the reference sequence
- 
+    
     seqan3::sequence_file_input<OLIGO> file_in{fasta};    // Initialise a file input object with a FASTA file.
 
     long t{0L}, m{(1L<<12)-1};                            // for progress printing
@@ -1496,12 +1504,20 @@ void SplitCoVfasta::split_fasta( )
         if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
         //for (auto & pcr : pcrs)  
-        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& pcr) 
+        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](PCRSplitter& pcr) 
         {
-            if constexpr (debugging >= debugging_TRACE+3)    seqan3::debug_stream << "Trace before check_rec\n" ;
-            target_count& tc = pcr.check_rec(record);
-            if constexpr (debugging >= debugging_TRACE)      seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
-            update_target_count(tc, pid);
+            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Trace before check_rec: " ;
+
+            auto tcop = pcr.check_rec(record);  // check in parallel for each PCR/target - that tc belong to current PCR - no data race
+            if (tcop) 
+            {
+                target_count& tc = *tcop;
+                if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
+            
+                update_target_count(tc, pid);
+            }
+            else 
+            {if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec FAILED\n" ;;}
         });
 
         if (!(++t & m))                                              // progress indication every 2^18 (m) sequences 
