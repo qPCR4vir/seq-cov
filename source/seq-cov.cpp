@@ -851,6 +851,7 @@ void PCRSplitter::write_grouped ()
         {    
             for (auto& [clade, cl]:  cc.clades       ) 
             {
+                if (!cl.id) continue;  // ERROR !!!!!
                 auto & pid = *cl.id;
 
                 id = std::format(
@@ -946,6 +947,7 @@ void PCRSplitter::write_msa_grouped ()
         {    
             for (auto& [clade, cl]:  cc.clades       ) 
             {
+                if (!cl.id) continue;  // ERROR !!!!!
                 auto & pid = *cl.id;
 
                 id = std::format(
