@@ -12,7 +12,7 @@
 #include <stdexcept>
 #include <execution>
 #include <chrono>
-
+	
 // #include <seqan3/std/ranges>                    // include all of the standard library's views
 #include <seqan3/alphabet/all.hpp>
 // #include <seqan3/alphabet/views/all.hpp>        // include all of SeqAn's views 
@@ -216,7 +216,7 @@ long find_primer(const oligo_seq_t& target, const oligo& primer, auto& config)
 } 
 
 
-// find both external primers in the sequence target and return the position of the amplicon
+// find one of the external primers in the sequence target and return the position of the amplicon
 SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
 {
     // new, unknown seq. We need to find the right position of the target sequence
@@ -229,7 +229,7 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
                             seqan3::align_cfg::output_end_position{}   ;
     auto method = seqan3::align_cfg::method_local{};
     seqan3::align_cfg::scoring_scheme     scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score   { 1}, 
-                                                    seqan3::mismatch_score{-1}}};
+                                                                                   seqan3::mismatch_score{-1}}};
     seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, 
                                                     seqan3::align_cfg::extension_score{-1}};
     auto config = method | scheme | gap_costs | output_config;
@@ -243,15 +243,15 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
     // find the forward primer in the near of the expected target sequence position (region = 200, 1000) 
 
     auto results = seqan3::align_pairwise(std::tie(target, fw_pr.seq), config);
-    
+
     for (auto & res : results | filter_v)
     {
-    if constexpr (debugging >= debugging_TRACE+3) 
+        if constexpr (debugging >= debugging_TRACE+3) 
         {
         seqan3::debug_stream << /*"Alignment: " << res.alignment() << */" Score: "     << res.score() ;
-    seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
-    seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
-    
+        seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
+        seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
+        
         fw_found = true;            
         sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;  // target begin position - primer begin position
         if (ref_len)  // not the first time/seq - the "ref." seq was already set
@@ -266,9 +266,9 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
             "the full forward primer. Score: " + std::to_string(res.score()) +
             " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
     }
-        if (!ref_len)
+    if (!ref_len)
         throw std::runtime_error{"First " + pcr_name + " sequence don't contain the forward primer but we want it to be the ref." };
-        else
+    else
         sg.beg = sg.end = 0;  // mark as not found !!    // we need to find rev primer location
 
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "try to align the external rev primer to target: " << '\n';
@@ -279,28 +279,28 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
     if (res_r_beg != res_rev.end())    
     {
         auto & res_r = *res_r_beg;
-    if constexpr (debugging >= debugging_TRACE+3) 
+        if constexpr (debugging >= debugging_TRACE+3) 
         {seqan3::debug_stream << /*"\nAlignment: " << res_r.alignment() <<  */" Score: "<< res_r.score() ;
-    seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
-    seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";}
+        seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
+        seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";}
 
-    if (res_r.score() > rev_pr.match)  // rev primer found. 
-    {   
+        if (res_r.score() > rev_pr.match)  // rev primer found. 
+        {   
             rv_found = true;
             sg.end = res_r.sequence1_end_position() + (rev_pr.seq.size() - res_r.sequence2_end_position()); // target begin position + primer length - primer begin position
-        if (ref_len) 
-            sg.beg = sg.end - ref_len;
-        else if (sg.end > target.size())
-            throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
+            if (ref_len) 
+                sg.beg = sg.end - ref_len;
+            else if (sg.end > target.size())
+                throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
                 "the full reverse primer. Score: " + std::to_string(res_r.score()) +
                 " that end at position "  + std::to_string(res_r.sequence2_end_position())  };
-        return sg;
-    }
+            return sg;
+        }
 
-    if (!ref_len) throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
+        if (!ref_len) throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
                                             "the reverse primer. Score: " + std::to_string(res_r.score() )};
-    sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
-    // todo  align with ref_seq
+        sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
+        // todo  align with ref_seq
     }
     sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
     if constexpr (debugging >= debugging_DEBUG) seqan3::debug_stream << pcr_name + " sequence don't contain any primer. Target length" << target.size() << '\n';
@@ -1486,13 +1486,36 @@ void SplitCoVfasta::split( )
 {
     // use chrono to logg the time reading metadata and splitting
     auto start = std::chrono::high_resolution_clock::now();
-    check_format();
-    read_metadata();      // fill metadata map keyed by Virus name
-    // take time
+    try
+    {
+        check_format();
+        read_metadata();      // fill metadata map keyed by Virus name
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error{ std::string("ERROR setting format or reading metadata") + e.what()};
+    }
+    catch(...)
+    {
+        throw std::runtime_error{ "ERROR setting format or reading metadata"};
+    }
+    
     auto stop_metadata = std::chrono::high_resolution_clock::now(); 
-    if (format == GISAID_format::fasta) 
-        split_fasta();
-    else split_msa();
+
+    try
+    {
+        if (format == GISAID_format::fasta)    split_fasta();
+        else                                     split_msa();        
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error{ std::string("ERROR splitting the fasta file") + e.what()};
+    }
+    catch(...)
+    {
+        throw std::runtime_error{ "ERROR splitting the fasta file"};
+    }
+
     // take time and logg in hours, minutes, seconds
     auto stop_split = std::chrono::high_resolution_clock::now();
     
@@ -1624,7 +1647,7 @@ void SplitCoVfasta::split_msa( )
                 seqan3::debug_stream << pcr.pcr_name <<"= " << pcr.count 
                                      << ". Grouped: "    << pcr.msa_grouped.size() << "\n" ; 
         }
-        if (t>7000) break;
+        if (t>17000) break;
     }
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
