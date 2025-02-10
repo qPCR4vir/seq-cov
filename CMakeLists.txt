@@ -17,11 +17,16 @@ if(COMPILER_SUPPORTS_MARCH_NATIVE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
+add_compile_options(-Wno-interference-size)
  
 # add seqan3 to search path
 list (APPEND CMAKE_PREFIX_PATH "C:/MinGW/include")
 list (APPEND CMAKE_PREFIX_PATH "C:/MinGW/lib")
 list (APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/seqan3/cmake")
+
+ 
+# require seqan3 with a version between >=3.0.0 and <4.0.0
+find_package (seqan3 3.0 REQUIRED)
 
 find_package (ZLIB QUIET)
 
@@ -33,10 +38,6 @@ if (ZLIB_FOUND)
 else ()
     message ("Optional dependency:        ZLIB not found.")
 endif ()
-
- 
-# require seqan3 with a version between >=3.0.0 and <4.0.0
-find_package (seqan3 3.0 REQUIRED)
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/nana" 
                  "${CMAKE_CURRENT_SOURCE_DIR}/../ExtLib/cmake-nana-build-${CMAKE_BUILD_TYPE}" )

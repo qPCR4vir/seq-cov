@@ -66,7 +66,7 @@ struct hash
         requires seqan3::semialphabet<std::ranges::range_reference_t<urng2_t>>
     size_t operator()(const urng2_t & range) const noexcept
     {
-        using alphabet_t = std::ranges::range_reference_t<urng_t>;
+        using alphabet_t = std::ranges::range_reference_t<urng2_t>;
         size_t result{0};
         std::hash<alphabet_t> h{};
         for (auto character : range)
