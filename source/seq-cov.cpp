@@ -682,13 +682,22 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 {
     const oligo_seq_t& full_target = record.sequence();
     count++;
-    if (full_target.size() > ref_end)
+    oligo& fw_pr = f_primers[extern_forw_idx];
+
+    for (long pos : hint1)                                              // first try hint1: most frecuent single amplicon positions with quick check
     {
-        const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+ref_beg, 
-                                                            full_target.begin()+ref_end}, target_count{});
+        if (pos >= full_target.size()) continue;  // out of the sequence
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\quick_check the forward primer at the Hint1 position: " << pos << "\n";
+        if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
+        
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint1 position: " << pos << "\n";
+        if constexpr (debugging >= debugging_INFO)     amplicon_pos_beg[pos]++;
+
+        long end = std::min<long>(full_target.size(), pos + ref_len);
+        const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
+                                                            full_target.begin()+end}, target_count{}); // todo: register the new position !!!!!
         target_count & target_c = it->second;
-        if (!is_new_seq) 
-        { 
+        if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
             target_c.count++;
             if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[ref_beg]++;
             return std::ref(target_c);  // 1-exact known position and sequence:
