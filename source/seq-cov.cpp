@@ -77,7 +77,7 @@ PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string pcr_name)
 bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
 {
     // just once - no need to be super efficient    
-        if (path_oligos.empty()) return false;   // todo: more checks?
+    if (path_oligos.empty()) return false;   // todo: more checks?
 
         if constexpr (debugging >= debugging_INFO) 
         {  seqan3::debug_stream << "\nGoing to load: " << path_oligos.string(); }
@@ -318,7 +318,7 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
         seqan3::debug_stream << /*"Alignment: " << res.alignment() << */" Score: "     << res.score() ;
         seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
         seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
-        
+               
         sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;  // target begin position - primer begin position
         if (ref_len)  // not the first time/seq - the "ref." seq was already set
         {
@@ -348,18 +348,18 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
         seqan3::debug_stream << ", Target: ("     << res_r.sequence1_begin_position() << "," << res_r.sequence1_end_position() << ")";
         seqan3::debug_stream << ", rev Primer: (" << res_r.sequence2_begin_position() << "," << res_r.sequence2_end_position() << "). ";}
 
-            sg.end = res_r.sequence1_end_position() + (rev_pr.seq.size() - res_r.sequence2_end_position()); // target begin position + primer length - primer begin position
+        sg.end = res_r.sequence1_end_position() + (rev_pr.seq.size() - res_r.sequence2_end_position()); // target begin position + primer length - primer begin position
         if (ref_len)  // not the first time/seq - the "ref." seq was already set
             { 
                 if ( sg.beg == sg.npos) sg.beg = sg.end - ref_len; // only find rev pr pos. Don't count for insertions/deletions or bad rev.
                 return sg;
             }  
-            else if (sg.end > target.size())
-                throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
-                "the full reverse primer. Score: " + std::to_string(res_r.score()) +
-                " that end at position "  + std::to_string(res_r.sequence2_end_position())  };
+        else if (sg.end > target.size())
+            throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
+            "the full reverse primer. Score: " + std::to_string(res_r.score()) +
+            " that end at position "  + std::to_string(res_r.sequence2_end_position())  };
         break;
-        }
+    }
     if (sg.beg != sg.npos && sg.end != sg.npos) return sg;    // we have both primers but still not the ref_len
     sg.beg = sg.end = sg.npos;                                // mark as not found !! 
     if constexpr (debugging >= debugging_DEBUG) seqan3::debug_stream << pcr_name + " PCR don't match the external primers in the Target region of length: " << target.size() << '\n';
@@ -686,7 +686,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                                                             full_target.begin()+end}, target_count{}); // todo: register the new position !!!!!
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
-            target_c.count++;
+        target_c.count++;
         if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[pos]++;
         return std::ref(target_c);          
     }
@@ -702,7 +702,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.beg = std::max<long>(0L                , hint2.beg + sg.beg);
             sg.end = std::min<long>(full_target.size(), hint2.beg + sg.end);
             if (sg.beg < sg.end)
-        {
+            {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint2 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
 
@@ -710,10 +710,10 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                                                                     full_target.begin()+sg.end}, target_count{});
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg); // New position and new sequence
-            target_c.count++;
+                target_c.count++;
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
-            return std::ref(target_c);
-        }
+                return std::ref(target_c);     
+            }
         }
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in Hint2 region\n";
     } 
@@ -728,7 +728,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     {
         if (pos >= full_target.size()) continue;  // out of the sequence
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
-
+        
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint3 position: " << pos << "\n";
         if constexpr (debugging >= debugging_INFO)     amplicon_pos_beg[pos]++;
 
@@ -755,11 +755,11 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             if (sg.beg < sg.end)
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
-            if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
 
-            const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
-                                                                full_target.begin()+sg.end}, target_count{});
-            target_count & target_c = it->second;
+                const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
+                                                                    full_target.begin()+sg.end}, target_count{});
+                target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
                 target_c.count++;
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
@@ -783,7 +783,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.beg = std::max<long>(0L                , sg.beg);
             sg.end = std::min<long>(full_target.size(), sg.end);
             if (sg.beg < sg.end)  // found the right position inside the Hint2 region
-            {            
+            {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
 
@@ -791,18 +791,18 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                                                                     full_target.begin()+sg.end}, target_count{});
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
-            target_c.count++;
+                target_c.count++;
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
-            return std::ref(target_c);
-        }
+                return std::ref(target_c);      
+            }
         }
     } 
     catch (std::exception & e) 
     {
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
-          << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
+            << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    
+
     if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in this target\n";
     return std::nullopt;
 }
@@ -1243,13 +1243,13 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
 
 }
 
-std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
+const std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
 { 
     // extract isolate from virus_name like BTC-4694 from hCoV-19/United Arab Emirates/BTC-4694/2021
     // between the second and third '/'. Return empty string_view if not found.
 
     std::size_t beg = virus_name.find('/', 8);
-    if (beg == std::string_view::npos) return std::string_view{};  
+    if (beg == std::string_view::npos) return virus_name;  
 
     std::size_t end = virus_name.find('/', ++beg);
     return virus_name.substr(beg, end - beg); 
@@ -1260,7 +1260,7 @@ std::string_view SplitCoVfasta::isolate(const std::string_view virus_name)
 std::ifstream SplitCoVfasta::open_metadata() const
 {
     // extract path of metadata file from the fasta file and add name metadata.tsv. Check if it exists.
-    std::filesystem::path metadata_fn = fasta.parent_path() / "metadata.tsv";
+    std::filesystem::path metadata_fn = dir / "metadata.tsv";
     if (!std::filesystem::exists(metadata_fn))
     {
         seqan3::debug_stream << "Metadata file " << metadata_fn << " does not exist\n";
@@ -1298,8 +1298,9 @@ std::unordered_map<std::string, size_t> SplitCoVfasta::parse_metadata_header(std
     size_t current_idx = 0;
     std::istringstream iss{header_line};
     std::string col;
-    while (std::getline(iss, col, '\t'))
-        col_index[col] = current_idx++;
+    
+    while (std::getline(iss, col, '\t'))    col_index[col] = current_idx++;
+
     return col_index;
 }
 
@@ -1323,32 +1324,33 @@ void SplitCoVfasta::read_metadata()
     // For convenience, find column indexes (if they exist) once:
     // We'll do lookups like col_index.find("Virus name"). 
     // (some might not exist in older metadata versions)
-    auto idx_virusname_it  = col_index.find("Virus name");
-    auto idx_EPI_ISL_it    = col_index.find("Accession ID");
-    auto idx_date_it       = col_index.find("Collection date");
-    auto idx_location_it   = col_index.find("Location");
-    auto idx_clade_it      = col_index.find("Clade");
-    auto idx_pango_it      = col_index.find("Pango lineage");
-    auto idx_pangover_it   = col_index.find("Pango version");
+    auto idx_virusname_it  = col_index.find("Virus name");       // hCoV-19/United Arab Emirates/BTC-4694/2021	
+    auto idx_EPI_ISL_it    = col_index.find("Accession ID");     // EPI_ISL_5142592
+    auto idx_date_it       = col_index.find("Collection date");  // 2021-01-31
+    auto idx_location_it   = col_index.find("Location");         // Asia / United Arab Emirates / Abu Dhabi
+    auto idx_clade_it      = col_index.find("Clade");            // GRY
+    auto idx_pango_it      = col_index.find("Pango lineage");    // B.1.1.7
+    auto idx_pangover_it   = col_index.find("Pango version");    // PANGO-v1.23
 
-    // Retrieve needed columns, if present:
-    // If not found, skip that field.
+    // Retrieve needed columns, if present: If not found, skip that field.
 
     // ----------------------------------------------------------------
     // 2. Prepare to parse lines in a memory-friendly manner
     // ----------------------------------------------------------------
     // We will parse them in-place, storing string_views that point into `line`.
     std::string line;
-    line.reserve(4096);  // a guess; adjust if lines are large
+    line.reserve(4096);                     // a guess; adjust if lines are large
     std::vector<std::string_view> cols;
-    cols.reserve(64);    // typical # of columns (over-reserve to avoid repeated allocations)
+    cols.reserve(64);                       // typical # of columns (over-reserve to avoid repeated allocations)
 
-    // For 16M lines, we might want to disable sync with stdio for speed:
-    // (some do this at the start of main)
-    // std::ios::sync_with_stdio(false);
-    // std::cin.tie(nullptr);
+    // For 17M lines, we might want to disable sync with stdio for speed: (some do this at the start of main)
+    // std::ios::sync_with_stdio(false);  std::cin.tie(nullptr);
+
     long date_errors = 0;
-    size_t lines_parsed = 0;
+    size_t lines_parsed = 0;                // todo print progress every 100k? lines or so
+    size_t duplicates = 0;                  // count duplicates
+    size_t empty_virusname = 0;             // count empty virus names
+
     while (std::getline(metadata_file, line))
     {
         if (line.empty()) continue;
@@ -1370,37 +1372,32 @@ void SplitCoVfasta::read_metadata()
                     start = i + 1;
                 }
             }
-            // last column after final tab (or if no tabs at all)
-            if (start < len)
+            if (start < len)                // last column after final tab (or if no tabs at all)
                 cols.emplace_back(str_data + start, len - start);
         }
-
         // We now have a vector of string_view columns. Let's extract the relevant fields.
-        if (idx_virusname_it->second >= cols.size())
-            continue; // skip if no column or no data - we need at least virus name, expected first field.
 
+                               // skip if no column or no data - we need at least virus name, expected first field.
+        if (idx_virusname_it->second >= cols.size())  { empty_virusname++; continue; }  // skip if no virus name
         std::string_view virus_name_sv = cols[idx_virusname_it->second];
-        if (virus_name_sv.empty())
-            continue; // skip if no virus name
+        if (virus_name_sv.empty())                    { empty_virusname++; continue; }  // skip if no virus name
 
-        parsed_id& pid = metadata[std::string{virus_name_sv}]; // reference to the newly inserted parsed_id
-        // Create the parsed_id in-place in the map, keyed by virus_name (string)?
+        parsed_id& pid = metadata[std::string{virus_name_sv}];          // reference to the newly inserted parsed_id
+        // Create the parsed_id in-place in the map, keyed by virus_name
         // We can do an emplace -> returns pair<iterator,bool>
         // We'll fill the struct with brace initialization.
         // auto [it, inserted] = metadata.try_emplace(std::string{virus_name_sv}, parsed_id{});
         // if already in map, skip or overwrite? 
-        // Let’s assume we skip re-parsing if it’s already inserted:
-        if (!pid.isolate.empty()) continue;
 
-        // parse the isolate from the "virus name" 
-        pid.isolate = isolate(virus_name_sv); 
+        if (!pid.isolate.empty()) {duplicates++; continue;}             // Let’s assume we skip re-parsing if it’s already inserted:
 
-        // 2.2. Parse Collection date -> pid.year, pid.month, pid.day
-        if (idx_date_it->second < cols.size())
+        pid.isolate = isolate(virus_name_sv);                           // parse the isolate from the "virus name" 
+
+        if (idx_date_it->second < cols.size())                          // 2.2. Parse Collection date -> pid.year, pid.month, pid.day. Working OK
         {
             std::string_view date_sv = cols[idx_date_it->second];
            
-            if (date_sv.size() == 10)  // e.g. "2021-03-31"
+            if (date_sv.size() == 10)                                   // e.g. "2021-03-31"
             {
                 auto d = date_sv.data();
               
@@ -1408,61 +1405,52 @@ void SplitCoVfasta::read_metadata()
                 auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
                 auto fc3 = std::from_chars(d + 8, d + 10, pid.day  );  // parse day
 
-                // optional: check fc1.ec, fc2.ec, fc3.ec for parse errors
+                          // optional: check fc1.ec, fc2.ec, fc3.ec for parse errors
             }
-            else  // log debug, and try using chrono to parse the date
-            if (date_sv.size() == 7)  // e.g. "2021-03"
+            else          // log debug, and try using chrono to parse the date
+            if (date_sv.size() == 7)                                   // e.g. "2021-03"
             {
                 auto d = date_sv.data();
               
-                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
-                auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
-
-                // optional: check fc1.ec, fc2.ec for parse errors
-            }
-            else  // log debug, and try using chrono to parse the date
-            if (date_sv.size() == 4)  // e.g. "2021"
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );   
+                auto fc2 = std::from_chars(d + 5, d +  7, pid.month);   
+             }
+            else         
+            if (date_sv.size() == 4)                                   // e.g. "2021"
             {
                 auto d = date_sv.data();
               
-                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
-
-                // optional: check fc1.ec for parse errors
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );   
             }
             else  
-            // 2024-1
-            if (date_sv.size() == 6)  // e.g. "2021-3"
+            if (date_sv.size() == 6)                                   // e.g. "2021-3"
             {
                 auto d = date_sv.data();
               
-                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
-                auto fc2 = std::from_chars(d + 5, d +  6, pid.month);  // parse month
-
-                // optional: check fc1.ec, fc2.ec for parse errors
+                auto fc1 = std::from_chars(d    , d +  4, pid.year ); 
+                auto fc2 = std::from_chars(d + 5, d +  6, pid.month);   
             }
             else
-            // 2023-12-4 or 2023-9-25 
-            if (date_sv.size() == 9)  // e.g. "2023-12-4" or "2023-9-25"
+            if (date_sv.size() == 9)                              // e.g. "2023-12-4" or "2023-9-25"
             {
                 auto d = date_sv.data();
               
-                auto fc1 = std::from_chars(d    , d +  4, pid.year );  // parse year
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );   
                 if (d[7] == '-')  // 2023-9-25
                 {
-                    auto fc2 = std::from_chars(d + 5, d +  6, pid.month);  // parse month
-                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  // parse day
+                    auto fc2 = std::from_chars(d + 5, d +  6, pid.month);   
+                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  
                 }
                 else  // 2023-12-4
                 {
-                    auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  // parse month
-                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  // parse day
+                    auto fc2 = std::from_chars(d + 5, d +  7, pid.month);  
+                    auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  
                 }
             }
-            else
-            // log debug, and try using chrono to parse the date
+            else                              // log debug, and try using chrono to parse the date?
             {
-                if (date_errors < 50)
-                seqan3::debug_stream << "ERROR: [read_metadata] " << ++date_errors << "- Unexpected date format: " << date_sv << " in " << line << '\n';
+                if (date_errors++ < 50)
+                    seqan3::debug_stream << "ERROR: [read_metadata] " << date_errors << "- Unexpected date format: " << date_sv << " in " << line << '\n';
 
                 // std::chrono::year_month_day ymd;
                 // // try to parse the date using chrono    from_stream 
@@ -1482,25 +1470,23 @@ void SplitCoVfasta::read_metadata()
             }
         }
 
-        // 2.3. Parse Location -> pid.continent, pid.country, pid.region
-        if (idx_location_it->second < cols.size())
+        if (idx_location_it->second < cols.size())        // 2.3. Parse Location -> pid.continent, pid.country, pid.region
         {
             std::string_view loc_sv = cols[idx_location_it->second];
 
-            //     e.g. "North America / USA / Michigan"
-            // We'll do a split by '/' to get up to 3 parts
+            //     e.g. "North America / USA / Michigan",  We'll do a split by '/' to get up to 3 parts
 
             auto continent_end = loc_sv.find('/');
             if (continent_end == std::string_view::npos)   
-                pid.continent = loc_sv;  // log an error? just set continent to the whole string
+                pid.continent = loc_sv;                           // log an error? just set continent to the whole string
             else
             {
                 pid.continent = loc_sv.substr(0, continent_end - 1);
                 auto country_start = continent_end + 2;
-                if (country_start < loc_sv.size())  // there is a country
+                if (country_start < loc_sv.size())                    // there is a country
                 {  
                     auto country_end   = loc_sv.find('/', country_start);
-                    if (country_end == std::string_view::npos) // log an error? just set country to the whole string
+                    if (country_end == std::string_view::npos)        // log an error? just set country to the whole string
                         pid.country = loc_sv.substr(country_start);
                     else
                     {
@@ -1515,26 +1501,25 @@ void SplitCoVfasta::read_metadata()
             }
         }
 
-        // 2.4. Clade
-        if ( idx_clade_it->second < cols.size())
-             pid.clade = cols[idx_clade_it->second];
+        if ( idx_clade_it->second < cols.size())                        // 2.4. Clade
+             pid.clade = cols[idx_clade_it->second];  
 
-        // 2.5. Pango lineage
-        if (idx_pango_it->second < cols.size())
+        if (idx_pango_it->second < cols.size())                         // 2.5. Pango lineage
             pid.pango = cols[idx_pango_it->second];
 
-        // 2.6. Pango version
-        if (idx_pangover_it->second < cols.size())
+        if (idx_pangover_it->second < cols.size())                      // 2.6. Pango version
             pid.pango_version  = cols[idx_pangover_it->second];
 
-        // 2.7. EPI_ISL
-        if (idx_EPI_ISL_it->second < cols.size())
+        if (idx_EPI_ISL_it->second < cols.size())                       // 2.7. EPI_ISL
             pid.EPI_ISL = cols[idx_EPI_ISL_it->second];
     }
 
-    if constexpr (debugging)
+    if constexpr (debugging >= debugging_INFO)
         seqan3::debug_stream << "[read_metadata] Parsed "  << lines_parsed 
-                             << " lines. metadata.size()=" << metadata.size() << '\n';
+                             << " lines. metadata.size()=" << metadata.size() 
+                             << ", duplicates=" << duplicates
+                             << ", empty_virusname=" << empty_virusname
+                             << ", date_errors=" << date_errors << '\n';
 }
 
 void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
@@ -1589,17 +1574,17 @@ GISAID_format SplitCoVfasta::check_format()
 
     for (auto&& ref_rec : file_in)                               // read the first record ONLY
     {    
-    if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is msa format
-        format = GISAID_format::msa;
-    else
-        format = GISAID_format::fasta;
+        if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is msa format
+            format = GISAID_format::msa;
+        else
+            format = GISAID_format::fasta;
 
-    // if debuging print the format found
-    if constexpr (debugging) 
-        seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';   
+        // if debuging print the format found
+        if constexpr (debugging) 
+            seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';   
 
-    return format;     
-}
+        return format; 
+    }
     throw std::runtime_error{"ERROR: Empty fasta file"};    
 }
 

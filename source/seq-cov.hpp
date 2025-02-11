@@ -384,7 +384,7 @@ class SplitCoVfasta
                            parse_metadata_header(std::ifstream &metadata_file);  ///< Parses the header of the metadata file
 
     /// Extract the isolate name from virus_name like "BTC-4694" from "hCoV-19/United Arab Emirates/BTC-4694/2021"
-    static std::string_view isolate(const std::string_view virus_name ///< @param virus_name: Full virus name (e.g. "hCoV-19/United Arab Emirates/BTC-4694/2021")
+    static const std::string_view isolate(const std::string_view virus_name ///< @param virus_name: Full virus name (e.g. "hCoV-19/United Arab Emirates/BTC-4694/2021")
                                    );     
     
  public:
