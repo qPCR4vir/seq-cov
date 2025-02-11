@@ -96,17 +96,82 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
             if constexpr (debugging >= debugging_VERBOSE) 
                 seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
-            // parse beg, end from id:   >SARS_NF+A -13900 MN908947.3: Seq pos: 28775-28794
+            // E_Sarbeco_F2 -13814 MN908947.3: Seq pos: 26308-26329, PosHint1=[26196	26208	26220	26219], PosHint2=[26171	26300], PosHint3=[26162	25995	25920	26168], PosHint4=[25116	26376]
+            
             oligo pr;
-            std::stringstream ss{id};
-            ss >> pr.name >> pr.code ;
 
-            std::string seq_pos = id.substr(id.find("Seq pos: ") + 9);
-            size_t dash_pos = seq_pos.find("-");
-            pr.ref_beg = std::stoi(seq_pos.substr(0, dash_pos));
-            pr.ref_end = std::stoi(seq_pos.substr(dash_pos + 1));
-            // todo check if beg, end are valid
+            std::stringstream ss{id};
+            ss >> pr.name >> pr.code ;                                 // Parse the primer name and code (first two tokens)
+            
+            std::size_t posPos = id.find("Seq pos: ");                 // Find and parse the "Seq pos: " field (e.g. "Seq pos: 26308-26329,")
+            if (posPos != std::string::npos)
+            {
+                std::string seqPos = id.substr(posPos + 9);            // skip "Seq pos: "
+                std::size_t commaPos = seqPos.find(',');               // Trim at the first comma in case hints follow immediately.
+                if (commaPos != std::string::npos)   seqPos = seqPos.substr(0, commaPos);
+                std::size_t dashPos = seqPos.find('-');
+                if (dashPos != std::string::npos)
+                {
+                    pr.ref_beg = std::stoi(seqPos.substr(0, dashPos));
+                    pr.ref_end = std::stoi(seqPos.substr(dashPos + 1));
+                }
+            }                                                          // todo check if beg, end are valid
             seqan3::debug_stream << " with beg: " << pr.ref_beg << " and end: " << pr.ref_end;
+
+            // Parse optional positional hints using a regex. Expected patterns:
+            //   PosHint1=[val ...]  -> vector<int>
+            //   PosHint2=[beg end]  -> SeqPos (hint2)
+            //   PosHint3=[val ...]  -> vector<int>
+            //   PosHint4=[beg end]  -> SeqPos (hint4)
+            std::regex hintRegex(R"(PosHint(\d)=\[(.*?)\])");
+            auto hintBegin = std::sregex_iterator(id.begin(), id.end(), hintRegex);
+            auto hintEnd   = std::sregex_iterator();
+            for (auto it = hintBegin; it != hintEnd; ++it)
+            {
+                std::smatch match = *it;
+                int hintIndex = std::stoi(match[1].str());
+                std::string hintStr = match[2].str();
+               
+                std::istringstream hintStream(hintStr);        // Tokenize by any whitespace.
+                std::vector<int> tokens;
+                int num;
+                while (hintStream >> num)
+                    tokens.push_back(num);
+                
+                switch(hintIndex)
+                {
+                    case 1:
+                        if (hint1.empty())           hint1 = tokens;
+                        break;
+
+                    case 2:
+                        if (tokens.size() == 2)        // Expect two tokens: begin and end values.
+                        {
+                            hint2.beg = tokens[0];
+                            hint2.end = tokens[1];
+                        } 
+                        else if (debugging >= debugging_ERROR) seqan3::debug_stream << "Invalid hint2: "  << hintStr <<
+                              "(please set to beg \t end of most frecuent amplicon region, like in PosHint2=[26171	26300]):  "<< '\n';
+                        break;
+
+                    case 3:
+                        if (hint3.empty())    hint3 = tokens;
+                        break;
+                    case 4:
+                        // Expect two tokens: begin and end values.
+                        if (tokens.size() == 2)
+                        {
+                            hint4.beg = tokens[0];
+                            hint4.end = tokens[1];
+                        }
+                        else if (debugging >= debugging_ERROR) seqan3::debug_stream << "Invalid hint4: "  << hintStr <<
+                              "(please set to beg \t end of region with almost all the rest of the amplicon positions, like in PosHint4=[25116	26376]):  "<< '\n';
+                        break;
+                    default:
+                        break;
+                }
+            }
+
             pr.seq  = std::move(primer.sequence());
             pr.len  = pr.seq.size();
             pr.match = std::round(parent.match * double(pr.len) / 100.0);
@@ -153,6 +218,22 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                 continue;
             }
         }
+        // logg info about hints
+        if constexpr (debugging >= debugging_INFO) 
+        {
+            seqan3::debug_stream << "\nHints for " << pcr_name << " PCR: ";
+
+            seqan3::debug_stream << "\nHint1: ";
+            for (auto & h : hint1) seqan3::debug_stream << h << " ";
+
+            seqan3::debug_stream << "\nHint2: " << hint2.beg << " " << hint2.end;
+
+            seqan3::debug_stream << "\nHint3: ";
+            for (auto & h : hint3) seqan3::debug_stream << h << " ";
+
+            seqan3::debug_stream << "\nHint4: " << hint4.beg << " " << hint4.end << std::endl;
+        }  
+
         ref_len = ref_end - ref_beg + 1;
         if (ref_len < 40) 
             throw std::runtime_error{"Amplicon length is too short: " + std::to_string(ref_len)};

@@ -202,6 +202,10 @@ struct PCRSplitter
 {
     /// temporal counter for anplicon position begin, (map of positiion: count) 
     std::map<int, int> amplicon_pos_beg;
+    std::vector<int> hint1,         ///< Hint for most frecuent amplicon position 
+                     hint3;         ///< Hint for most frecuent amplicon position out of Hint2
+    SeqPos           hint2{-1,-1},  ///< Hint for most frecuent amplicon region
+                     hint4{-1,-1};  ///< Hint for region with almost all the rest of the amplicon positions   
 
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; ///< Scoring scheme for mismatches (default is hamming distance)
 
