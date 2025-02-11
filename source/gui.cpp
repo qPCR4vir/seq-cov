@@ -17,7 +17,7 @@
 using namespace cov;
 GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
 {
-    caption("Split-CoV-fasta. v4.00.00");
+    caption("Split-CoV-fasta. v4.01.00");
 
     input_file.tip_string("Original fasta file:").multi_lines(false);
     flank.range(0, 100, 1);
@@ -45,7 +45,7 @@ GUI::GUI() : nana::form{nana::api::make_center(1000, 350)}
         // todo implement conditional split
         try
             {
-                Add_Gene(E);
+                Add_Gene(E);  // read_oligos
                 Add_Gene(N);
                 Add_Gene(S);  
                 Add_Gene(R);

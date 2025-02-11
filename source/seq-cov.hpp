@@ -175,7 +175,6 @@ struct target_count
 enum class GISAID_format {fasta, gene_msa, msa, allprot, allaa, allcodon, allnucprot, allnucaa, allnucprotcodon, allnucprotcodonaa};
 class SplitCoVfasta;
 
-
 /**
  * Contains information and methods for processing PCR targets.
  * 

@@ -76,13 +76,14 @@ PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string pcr_name)
 
 bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
 {
+    // just once - no need to be super efficient    
         if (path_oligos.empty()) return false;   // todo: more checks?
 
         if constexpr (debugging >= debugging_INFO) 
         {  seqan3::debug_stream << "\nGoing to load: " << path_oligos.string(); }
         seqan3::sequence_file_input<OLIGO> file_in{path_oligos};
         std::string fw, rv;
-        ref_beg = std::numeric_limits<long>::max();
+        ref_beg = std::numeric_limits<long>::max();        // agresive initialization: but the whole class is create every time the user click 'split'
         ref_end = std::numeric_limits<long>::min();
         f_primers.clear();
         r_primers.clear();
@@ -93,9 +94,8 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
 
         for (auto & primer : file_in)
         {
-            std::string id = std::move(primer.id());
-            if constexpr (debugging >= debugging_VERBOSE) 
-                seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
+            std::string id{primer.id()};
+            if constexpr (debugging >= debugging_VERBOSE)    seqan3::debug_stream << "\nGoing to check: " << id << "\n" << primer.sequence();
 
             // E_Sarbeco_F2 -13814 MN908947.3: Seq pos: 26308-26329, PosHint1=[26196	26208	26220	26219], PosHint2=[26171	26300], PosHint3=[26162	25995	25920	26168], PosHint4=[25116	26376]
             
@@ -116,15 +116,15 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                     pr.ref_beg = std::stoi(seqPos.substr(0, dashPos));
                     pr.ref_end = std::stoi(seqPos.substr(dashPos + 1));
                 }
-            }                                                          // todo check if beg, end are valid
-            seqan3::debug_stream << " with beg: " << pr.ref_beg << " and end: " << pr.ref_end;
+            }                                                          // for check if beg, end are valid see below
+            if constexpr (debugging >= debugging_VERBOSE)    seqan3::debug_stream << " with beg: " << pr.ref_beg << " and end: " << pr.ref_end;
 
             // Parse optional positional hints using a regex. Expected patterns:
             //   PosHint1=[val ...]  -> vector<int>
             //   PosHint2=[beg end]  -> SeqPos (hint2)
             //   PosHint3=[val ...]  -> vector<int>
             //   PosHint4=[beg end]  -> SeqPos (hint4)
-            std::regex hintRegex(R"(PosHint(\d)=\[(.*?)\])");
+            std::regex hintRegex(R"(PosHint(\d)=\[(.*?)\])");                           // ask OpenAI o3
             auto hintBegin = std::sregex_iterator(id.begin(), id.end(), hintRegex);
             auto hintEnd   = std::sregex_iterator();
             for (auto it = hintBegin; it != hintEnd; ++it)
@@ -136,17 +136,13 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                 std::istringstream hintStream(hintStr);        // Tokenize by any whitespace.
                 std::vector<int> tokens;
                 int num;
-                while (hintStream >> num)
-                    tokens.push_back(num);
+                while (hintStream >> num)    tokens.push_back(num);
                 
                 switch(hintIndex)
                 {
-                    case 1:
-                        if (hint1.empty())           hint1 = tokens;
-                        break;
+                    case 1:  if (hint1.empty())           hint1 = tokens;                        break;
 
-                    case 2:
-                        if (tokens.size() == 2)        // Expect two tokens: begin and end values.
+                    case 2:  if (tokens.size() == 2)           // Expect two tokens: begin and end values.
                         {
                             hint2.beg = tokens[0];
                             hint2.end = tokens[1];
@@ -155,12 +151,9 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                               "(please set to beg \t end of most frecuent amplicon region, like in PosHint2=[26171	26300]):  "<< '\n';
                         break;
 
-                    case 3:
-                        if (hint3.empty())    hint3 = tokens;
-                        break;
-                    case 4:
-                        // Expect two tokens: begin and end values.
-                        if (tokens.size() == 2)
+                    case 3:  if (hint3.empty())    hint3 = tokens;                             break;
+                    
+                    case 4:  if (tokens.size() == 2)          // Expect two tokens: begin and end values.
                         {
                             hint4.beg = tokens[0];
                             hint4.end = tokens[1];
@@ -168,19 +161,16 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                         else if (debugging >= debugging_ERROR) seqan3::debug_stream << "Invalid hint4: "  << hintStr <<
                               "(please set to beg \t end of region with almost all the rest of the amplicon positions, like in PosHint4=[25116	26376]):  "<< '\n';
                         break;
-                    default:
-                        break;
+                    
+                    default:                        break;
                 }
             }
-
-            pr.seq  = std::move(primer.sequence());
-            pr.len  = pr.seq.size();
+            pr.seq   = primer.sequence();
+            pr.len   = pr.seq.size();
             pr.match = std::round(parent.match * double(pr.len) / 100.0);
-            if constexpr (debugging) 
-                seqan3::debug_stream << " with minimum matches:" << pr.match;
+            if constexpr (debugging >= debugging_VERBOSE)  seqan3::debug_stream << " with minimum matches:" << pr.match;
 
-            // update this PCR-amplicon
-            if (pr.ref_beg < pr.ref_end)   
+            if (pr.ref_beg < pr.ref_end)                    // update this PCR-amplicon
             {
                 pr.reverse = false;
 
@@ -190,7 +180,7 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                     " instead of " + std::to_string(pr.ref_end - pr.ref_beg + 1) + " at position " + std::to_string(pr.ref_beg) 
                     + " to " + std::to_string(pr.ref_end)};
 
-                if ( ref_beg > pr.ref_beg)  // current extern forward primer
+                if ( ref_beg > pr.ref_beg)               // current extern forward primer
                 {
                     ref_beg = pr.ref_beg;
                     extern_forw_idx = f_primers.size();
@@ -209,7 +199,7 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                     " instead of " + std::to_string(pr.ref_beg - pr.ref_end + 1) + " at position " + std::to_string(pr.ref_beg) 
                     + " to " + std::to_string(pr.ref_end)};
 
-                if (ref_end < pr.ref_beg)  // extern reverse primer
+                if (ref_end < pr.ref_beg)                          // extern reverse primer
                 {
                     ref_end = pr.ref_beg;
                     extern_rev_idx = r_primers.size();
@@ -219,8 +209,8 @@ bool PCRSplitter::read_oligos(const std::filesystem::path& path_oligos)
                 continue;
             }
         }
-        // logg info about hints
-        if constexpr (debugging >= debugging_INFO) 
+ 
+        if constexpr (debugging >= debugging_INFO)        // logg info about hints
         {
             seqan3::debug_stream << "\nHints for " << pcr_name << " PCR: ";
 
@@ -1591,13 +1581,14 @@ void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
 
 }
 
-// check format by reading and checking the first record
+// check format by reading and checking the first record. todo: too simple, make more checks??
 GISAID_format SplitCoVfasta::check_format()
 {
     // Initialise a file input object with the fasta file.
     seqan3::sequence_file_input<MSA> file_in{fasta};
 
-    auto&& ref_rec = *file_in.begin();
+    for (auto&& ref_rec : file_in)                               // read the first record ONLY
+    {    
     if (ref_rec.id().find("EPI_ISL_") != std::string::npos)  // we assume it is msa format
         format = GISAID_format::msa;
     else
@@ -1608,6 +1599,8 @@ GISAID_format SplitCoVfasta::check_format()
         seqan3::debug_stream << "\nFormat: " << (format == GISAID_format::msa ? "msa" : "fasta") << '\n';   
 
     return format;     
+}
+    throw std::runtime_error{"ERROR: Empty fasta file"};    
 }
 
 void SplitCoVfasta::split( )
