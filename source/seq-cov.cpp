@@ -49,11 +49,12 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
  {
     int pr_beg = primer.ref_beg + offset;
     int len = primer.seq.size();
+    if (pr_beg < 0 || pr_beg + len > target.size()) return false;  // primer is out of the target
     int mm = len - primer.match;  // maximum number of mismatches
     if (mm < 1) mm = 1;  // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
     for (int i = 0; i < len; ++i)
     {
-        if (!mismatch.score(primer.seq[i], target[pr_beg + i]))   
+        if (mismatch.score(primer.seq[i], target[pr_beg + i]))   
             if (--mm ) return false;
     }
     return true;
