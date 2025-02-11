@@ -237,11 +237,6 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
 
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "try to align the external fw primer to target: " << '\n';
 
-    bool fw_found = false, rv_found = false;
-
-
-    // find the forward primer in the near of the expected target sequence position (region = 200, 1000) 
-
     auto results = seqan3::align_pairwise(std::tie(target, fw_pr.seq), config);
 
     for (auto & res : results | filter_v)
@@ -252,7 +247,6 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
         seqan3::debug_stream << ", Target: (" << res.sequence1_begin_position() << "," << res.sequence1_end_position() << ")";
         seqan3::debug_stream << ", Primer: (" << res.sequence2_begin_position() << "," << res.sequence2_end_position() << "). " ;}
         
-        fw_found = true;            
         sg.beg = res.sequence1_begin_position() - res.sequence2_begin_position() ;  // target begin position - primer begin position
         if (ref_len)  // not the first time/seq - the "ref." seq was already set
         {
@@ -266,10 +260,8 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
             "the full forward primer. Score: " + std::to_string(res.score()) +
             " that begin at position "  + std::to_string(res.sequence2_begin_position())  };
     }
-    if (!ref_len)
+    if (!ref_len && sg.beg == sg.npos) // the fw primer was not found in the target and we don't have the ref_len
         throw std::runtime_error{"First " + pcr_name + " sequence don't contain the forward primer but we want it to be the ref." };
-    else
-        sg.beg = sg.end = 0;  // mark as not found !!    // we need to find rev primer location
 
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "try to align the external rev primer to target: " << '\n';
 
@@ -288,22 +280,20 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
         {   
             rv_found = true;
             sg.end = res_r.sequence1_end_position() + (rev_pr.seq.size() - res_r.sequence2_end_position()); // target begin position + primer length - primer begin position
-            if (ref_len) 
-                sg.beg = sg.end - ref_len;
+        if (ref_len)  // not the first time/seq - the "ref." seq was already set
+            { 
+                if ( sg.beg == sg.npos) sg.beg = sg.end - ref_len; // only find rev pr pos. Don't count for insertions/deletions or bad rev.
+                return sg;
+            }  
             else if (sg.end > target.size())
                 throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
                 "the full reverse primer. Score: " + std::to_string(res_r.score()) +
                 " that end at position "  + std::to_string(res_r.sequence2_end_position())  };
             return sg;
         }
-
-        if (!ref_len) throw std::runtime_error{"First " + pcr_name + " sequence don't contain "
-                                            "the reverse primer. Score: " + std::to_string(res_r.score() )};
-        sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
-        // todo  align with ref_seq
-    }
-    sg.beg = sg.end = 0;  // mark as not found !! Better try to align whole seq?? not sure..
-    if constexpr (debugging >= debugging_DEBUG) seqan3::debug_stream << pcr_name + " sequence don't contain any primer. Target length" << target.size() << '\n';
+    if (sg.beg != sg.npos && sg.end != sg.npos) return sg;    // we have both primers but still not the ref_len
+    sg.beg = sg.end = sg.npos;                                // mark as not found !! 
+    if constexpr (debugging >= debugging_DEBUG) seqan3::debug_stream << pcr_name + " PCR don't match the external primers in the Target region of length: " << target.size() << '\n';
     return sg;
 }
 

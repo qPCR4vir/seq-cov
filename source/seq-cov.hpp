@@ -94,7 +94,11 @@ struct OLIGO : seqan3::sequence_file_input_default_traits_dna
     using sequence_alphabet = oligo_seq_alph; // instead of dna5
     
 };
-struct SeqPos {long beg{0}, end{0};};
+struct SeqPos 
+{
+    static constexpr long npos = std::numeric_limits<long>::max();
+    long beg{npos}, end{npos};
+};
 struct oligo
 {
     oligo_seq_t   seq, ref_seq;
