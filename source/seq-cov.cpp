@@ -726,18 +726,35 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
             return std::ref(target_c);
         }
-        // 3-New position:
-        
-        // discard wrong seq/target_c
-        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarding wrong sequence: "  ;
-        
-        grouped.erase(it);
-
-        if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "\nDiscarded wrong sequence: " ;
+        }
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in Hint2 region\n";
+    } 
+    catch (std::exception & e) 
+    {
+        if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
+          << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    
-    // try to find the right position of the target sequence  todo: expand by 1000 that region, if fails use the whole sequence, and try inverted too
-    try 
+
+    // try hint3: less frecuent single amplicon positions with quick check
+    for (long pos : hint3)
+    {
+        if (pos >= full_target.size()) continue;  // out of the sequence
+        if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
+
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint3 position: " << pos << "\n";
+        if constexpr (debugging >= debugging_INFO)     amplicon_pos_beg[pos]++;
+
+        long end = std::min<long>(full_target.size(), pos + ref_len);
+        const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
+                                                            full_target.begin()+pos+ref_len}, target_count{}); // todo: register the new position !!!!!
+        target_count & target_c = it->second;
+        if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
+        target_c.count++;
+        if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[pos]++;
+        return std::ref(target_c);          
+    }
+
+    if (full_target.size() > hint4.beg) try 
     {
         SeqPos sg = find_ampl_pos(full_target);
         
