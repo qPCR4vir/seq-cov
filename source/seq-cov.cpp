@@ -774,21 +774,40 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
                 target_c.count++;
-                if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nFound the amplicon alrready: " << target_c.target.target_pattern << "\n";
-                
-                return std::ref(target_c);  // 3- known sequence but new position .  todo: register the new position !!!!! 
-            }
-            if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Going to evaluate the target sequence" ;
-            
-            evaluate_target(target_c.target, full_target, sg.beg); // 3- new sequence in new position .  todo: register the new position !!!!! 
-            
-            if constexpr (debugging >= debugging_TRACE+3)  seqan3::debug_stream << "3- new sequence in new position. Evaluated the target sequence" << '\n';
+                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+                return std::ref(target_c);   
+            }   
+        }
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in Hint4 region\n";
+    } 
+    catch (std::exception & e) 
+    {
+        if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
+            << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
+    }
+    
+    try // search full_target
+    {
+        SeqPos sg = find_ampl_pos(full_target);
+        
+        if (sg.beg != sg.npos && sg.end != sg.npos & sg.beg < sg.end)  // found the right position inside the Hint4 region
+        {
+            sg.beg = std::max<long>(0L                , sg.beg);
+            sg.end = std::min<long>(full_target.size(), sg.end);
+            if (sg.beg < sg.end)  // found the right position inside the Hint2 region
+            {            
+                if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
+                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
 
+                const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
+                                                                    full_target.begin()+sg.end}, target_count{});
+                target_count & target_c = it->second;
+                if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
             target_c.count++;
+                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
             return std::ref(target_c);
         }
-        if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found"  
-            << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
+        }
     } 
     catch (std::exception & e) 
     {
@@ -796,6 +815,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
           << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
     
+    if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in this target\n";
     return std::nullopt;
 }
 
