@@ -89,11 +89,88 @@ struct MSA : seqan3::sequence_file_input_default_traits_dna
     using sequence_alphabet = msa_seq_alph; // instead of dna5
     using sequence_legal_alphabet = msa_seq_alph;
 };
+/*
+struct dna_all_char : seqan3::dna15
+{
+    using seqan3::dna15::dna15;
+private:
+    //!\brief The base class.
+    using base_t = nucleotide_base<dna15, 15>;
+
+    //!\brief Befriend seqan3::nucleotide_base.
+    friend base_t;
+    //!\cond
+    //!\brief Befriend seqan3::alphabet_base.
+
+    static constexpr bool char_is_valid(char const c) noexcept
+    {
+        return true;
+    }
+};*/
+
+struct all_char_alphabet
+{
+    using rank_type = uint8_t;
+    static constexpr size_t alphabet_size = 256; // Accept all possible char values.
+    
+    char value{}; // Underlying value.
+
+    // Default constructor and constructor from char.
+    constexpr all_char_alphabet() noexcept = default;
+    constexpr all_char_alphabet(char c) noexcept : value{c} {}
+
+    // REQUIRED: assign_char() for the writable_alphabet concept.
+    constexpr all_char_alphabet & assign_char(char const c) noexcept
+    {
+        value = c;
+        return *this;
+    }
+
+    // to_char() returns the stored character.
+    constexpr char to_char() const noexcept
+    {
+        return value;
+    }
+
+    // Provide a rank representation (here, simply the char's value).
+    constexpr rank_type to_rank() const noexcept
+    {
+        return static_cast<rank_type>(value);
+    }
+
+    // Allow assignment from a rank.
+    constexpr all_char_alphabet & assign_rank(rank_type const r) noexcept
+    {
+        value = static_cast<char>(r);
+        return *this;
+    }
+
+    // Always consider any char valid.
+    static constexpr bool char_is_valid(char const) noexcept
+    {
+        return true;
+    }
+
+    // Explicit conversion to seqan3::dna15.
+    constexpr operator seqan3::dna15() const noexcept
+    {
+        auto d = seqan3::dna15{};
+        // If the stored char is valid for dna15, use it; otherwise, map to 'N'.
+        if (seqan3::dna15::char_is_valid(value))
+            d.assign_char(value);
+        else
+            d.assign_char('N');
+        return d;
+    }
+};
 struct OLIGO : seqan3::sequence_file_input_default_traits_dna
 {
     using sequence_alphabet = oligo_seq_alph; // instead of dna5
-    
+    // sequence_legal_alphabet  dna15, but we need just any char to dna15 other N
+    using sequence_legal_alphabet = oligo_seq_alph; 
+    // instead of dna15, but we need just any char to dna15 other N
 };
+
 struct SeqPos 
 {
     static constexpr const long npos = std::numeric_limits<long>::max();
