@@ -694,10 +694,11 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     if (full_target.size() > hint2.beg) try 
     {
         long end = std::min<long>(full_target.size(), hint2.end);
-        SeqPos sg = find_ampl_pos({full_target.begin()+hint2.beg, 
-                                   full_target.begin()+end});
         
-        if (sg.beg != sg.npos && sg.end != sg.npos & sg.beg < sg.end)  // found the right position inside the Hint2 region
+        SeqPos sg = find_ampl_pos({full_target.begin() + hint2.beg, 
+                                   full_target.begin() + end      });
+        
+        if (sg.beg != sg.npos && sg.end != sg.npos && sg.beg < sg.end)            // found the right position inside the Hint2 region
         {
             sg.beg = std::max<long>(0L                , hint2.beg + sg.beg);
             sg.end = std::min<long>(full_target.size(), hint2.beg + sg.end);
@@ -734,7 +735,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 
         long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
-                                                            full_target.begin()+pos+ref_len}, target_count{}); // todo: register the new position !!!!!
+                                                            full_target.begin()+end}, target_count{}); 
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
         target_c.count++;
@@ -748,7 +749,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         SeqPos sg = find_ampl_pos({full_target.begin()+hint4.beg, 
                                    full_target.begin()+end});
         
-        if (sg.beg != sg.npos && sg.end != sg.npos & sg.beg < sg.end)  // found the right position inside the Hint4 region
+        if (sg.beg != sg.npos && sg.end != sg.npos && sg.beg < sg.end)                           // found the right position inside the Hint4 region
         {
             sg.beg = std::max<long>(0L                , hint4.beg + sg.beg);
             sg.end = std::min<long>(full_target.size(), hint4.beg + sg.end);
@@ -778,7 +779,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     {
         SeqPos sg = find_ampl_pos(full_target);
         
-        if (sg.beg != sg.npos && sg.end != sg.npos & sg.beg < sg.end)  // found the right position inside the Hint4 region
+        if (sg.beg != sg.npos && sg.end != sg.npos && sg.beg < sg.end)  // found the right position inside the Hint4 region
         {
             sg.beg = std::max<long>(0L                , sg.beg);
             sg.end = std::min<long>(full_target.size(), sg.end);
