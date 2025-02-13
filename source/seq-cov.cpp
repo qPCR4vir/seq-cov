@@ -1447,6 +1447,15 @@ void SplitCoVfasta::read_metadata()
                     auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  
                 }
             }
+// 2024-4-2
+            else if (date_sv.size() == 8)                              // e.g. "2024-4-2"
+            {
+                auto d = date_sv.data();
+              
+                auto fc1 = std::from_chars(d    , d +  4, pid.year );   
+                auto fc2 = std::from_chars(d + 5, d +  6, pid.month);   
+                auto fc3 = std::from_chars(d + 7, d +  8, pid.day  );  
+            }
             else                              // log debug, and try using chrono to parse the date?
             {
                 if (date_errors++ < 50)
