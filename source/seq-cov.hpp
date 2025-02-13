@@ -283,6 +283,9 @@ struct PCRSplitter
     SeqPos           hint2{-1,-1},  ///< Hint for most frecuent amplicon region
                      hint4{-1,-1};  ///< Hint for region with almost all the rest of the amplicon positions   
 
+    long count_hint1{0}, count_hint2{0}, count_hint3{0}, count_hint4{0}, 
+         count_full{0}, count_not_found{0};  ///< Count of sequences detected by hints
+
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; ///< Scoring scheme for mismatches (default is hamming distance)
 
     SplitCoVfasta const &parent;             ///< Parent SplitCoVfasta instance

@@ -671,6 +671,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     count++;
     oligo& fw_pr = f_primers[extern_forw_idx];
 
+
     for (long pos : hint1)                                              // first try hint1: most frecuent single amplicon positions with quick check
     {
         if (pos >= full_target.size()) continue;               // out of the sequence
@@ -678,7 +679,8 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint1 position: " << pos << "\n";
-        if constexpr (debugging >= debugging_INFO)   amplicon_pos_beg[pos]++;
+        if constexpr (debugging >= debugging_NOT_USED)   amplicon_pos_beg[pos]++;
+        count_hint1++;
 
         long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
@@ -686,11 +688,13 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
         target_c.count++;
-        if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[pos]++;
+
         return std::ref(target_c);          
     }
 
-    if (full_target.size() > hint2.beg) try 
+    // return std::nullopt;    
+
+    if (full_target.size() > hint2.beg) try                                         // found the right position inside the Hint2 region
     {
         long end = std::min<long>(full_target.size(), hint2.end);
         
@@ -703,15 +707,16 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.end = std::min<long>(full_target.size(), hint2.beg + sg.end);
             if (sg.beg < sg.end)
             {
-                if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint2 region position: " << sg.beg << " to " << sg.end << "\n";
-                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+                if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint2 region position: " << sg.beg << " to " << sg.end << std::endl;
+                if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
+                count_hint2++;
 
                 const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
                                                                     full_target.begin()+sg.end}, target_count{});
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg); // New position and new sequence
                 target_c.count++;
-                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+
                 return std::ref(target_c);     
             }
         }
@@ -723,26 +728,31 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
           << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
 
-    // try hint3: less frecuent single amplicon positions with quick check
-    for (long pos : hint3)
+    // return std::nullopt;    
+
+    for (long pos : hint3)                                                          // try hint3: less frecuent single amplicon positions with quick check
     {
         if (pos >= full_target.size()) continue;  // out of the sequence
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint3 position: " << pos << "\n";
-        if constexpr (debugging >= debugging_INFO)     amplicon_pos_beg[pos]++;
+        if constexpr (debugging >= debugging_NOT_USED)     amplicon_pos_beg[pos]++;
+        count_hint3++;
 
         long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
                                                             full_target.begin()+end}, target_count{}); 
         target_count & target_c = it->second;
-        if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
+        if (is_new_seq) evaluate_target(target_c.target, full_target, pos);                            // 2-known position but new sequence
         target_c.count++;
-        if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[pos]++;
+
         return std::ref(target_c);          
     }
 
-    if (full_target.size() > hint4.beg) try 
+
+    // return std::nullopt;    
+
+    if (full_target.size() > hint4.beg) try                                                  // found the right position inside the Hint4 region
     {
         long end = std::min<long>(full_target.size(), hint4.end);
         SeqPos sg = find_ampl_pos({full_target.begin()+hint4.beg, 
@@ -755,14 +765,15 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             if (sg.beg < sg.end)
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
-                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+                if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
+                count_hint4++;
 
                 const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
                                                                     full_target.begin()+sg.end}, target_count{});
                 target_count & target_c = it->second;
-                if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
+                if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);               // New position and new sequence
                 target_c.count++;
-                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+
                 return std::ref(target_c);   
             }   
         }
@@ -774,7 +785,9 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
     
-    try // search full_target
+    // return std::nullopt;    
+
+    try                                                                                       // search full_target
     {
         SeqPos sg = find_ampl_pos(full_target);
         
@@ -786,13 +799,14 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+                count_full++;
 
                 const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+sg.beg,
                                                                     full_target.begin()+sg.end}, target_count{});
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
                 target_c.count++;
-                if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
+
                 return std::ref(target_c);      
             }
         }
@@ -804,6 +818,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     }
 
     if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in this target\n";
+    count_not_found++;
     return std::nullopt;
 }
 
@@ -1712,6 +1727,7 @@ void SplitCoVfasta::split_fasta( )
         }
         if constexpr (debugging >= break_by) if (t>=break_point) break;     // set for debugging only  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     }
+    
     seqan3::debug_stream << "\nTotal= " << t  << "\n" ; 
 
     for (auto & pcr : pcrs)                // write grouped sequences for each PCR/target
@@ -1720,12 +1736,18 @@ void SplitCoVfasta::split_fasta( )
                              << ". Grouped: "    << pcr.grouped.size() << ". " ; 
         pcr.write_grouped();
         // by debugging level print the amplicon_pos_beg (map of positiion: count) in descending order of counts (values)
-        if constexpr (debugging >= debugging_INFO)
+        if constexpr (debugging >= debugging_NOT_USED)
         {
             //std::multimap<int, int, std::greater<>> inverted{pcr.amplicon_pos_beg.begin(), pcr.amplicon_pos_beg.end()};
             seqan3::debug_stream << "Amplicon_reference pos beg: " << pcr.ref_beg << '\n'; 
             for (auto& [pos, count] : pcr.amplicon_pos_beg)
                 seqan3::debug_stream << "pos: "  << pos << ", count: " << count << '\n';
+            seqan3::debug_stream << "Detected with Hint1: " << pcr.count_hint1 << '\n';
+            seqan3::debug_stream << "Detected with Hint2: " << pcr.count_hint2 << '\n';
+            seqan3::debug_stream << "Detected with Hint3: " << pcr.count_hint3 << '\n';
+            seqan3::debug_stream << "Detected with Hint4: " << pcr.count_hint4 << '\n';
+            seqan3::debug_stream << "Detected with full seq: " << pcr.count_full << '\n';
+            seqan3::debug_stream << "Not detected: "         << pcr.count_not_found << '\n';
         }
     }
 
