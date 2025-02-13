@@ -1671,17 +1671,46 @@ void SplitCoVfasta::split( )
                                                          << duration_split.count() % 60 << '\n';
 }
 
+void skip_bad(auto& it, const auto& end)
+{
+    bool bad = true;
+    while (bad && it != end)
+    {
+        try
+        {
+            ++it;
+            bad = false;
+        }
+        catch(const std::exception& e)
+        {
+            if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << "ERROR reading sequence: " << e.what() << '\n';
+
+            try {it.seek_to(it.file_position()+1);} 
+            catch(...) {}  
+        }
+    }
+}
+
+
 void SplitCoVfasta::split_fasta( )
 {
     set_ref_seq();                                        // load the reference sequence
     
     seqan3::sequence_file_input<OLIGO> file_in{fasta};    // Initialise a file input object with a FASTA file.
 
-    long t{0L}, m{(1L<<12)-1};                            // for progress printing
+    long t{0L}, m{(1L<<16)-1};                            // for progress printing
     seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
-    for (auto && record : file_in)                        // read each sequence in the file sequencially !!
+    std::string id ;
+
+    decltype(file_in.begin()) it;
+    try { it = file_in.begin(); } catch(...) {skip_bad(it, file_in.end());}            // some seq. are proteins not nucleotides
+
+    while(it != file_in.end())  // read each sequence in the file sequencially !! One by one record!
     {
+            auto && record = *it;
+            id = record.id();    
+
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\n" << record.id() << '\n' ;
 
         std::string_view virus_name = record.id();
@@ -1717,7 +1746,18 @@ void SplitCoVfasta::split_fasta( )
             }
             else 
             {if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec FAILED\n" ;;}
-        });
+            }
+            //);  
+
+            try
+            {
+                ++it;
+            }
+            catch(const std::exception& e)
+            {
+                if constexpr (debugging >= debugging_ERROR) seqan3::debug_stream << "ERROR reading the sequence after: " << t << ": " << id << " becouse of: " << e.what() << '\n';
+                skip_bad(it, file_in.end());
+            }
 
         if (!(++t & m))                                              // progress indication every 2^18 (m) sequences 
         {
