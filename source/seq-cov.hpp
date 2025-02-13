@@ -96,7 +96,7 @@ struct OLIGO : seqan3::sequence_file_input_default_traits_dna
 };
 struct SeqPos 
 {
-    static constexpr long npos = std::numeric_limits<long>::max();
+    static constexpr const long npos = std::numeric_limits<long>::max();
     long beg{npos}, end{npos};
 };
 struct oligo
@@ -208,10 +208,10 @@ struct PCRSplitter
 
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; ///< Scoring scheme for mismatches (default is hamming distance)
 
-    SplitCoVfasta &   parent;             ///< Parent SplitCoVfasta instance
+    SplitCoVfasta const &parent;             ///< Parent SplitCoVfasta instance
     const std::string pcr_name;           ///< PCR name
 
-    PCRSplitter( SplitCoVfasta &parent,   ///< Parent SplitCoVfasta instance
+    PCRSplitter( SplitCoVfasta const &parent,   ///< Parent SplitCoVfasta instance
                 std::string   pcr_name    ///< PCR name
              );
     
@@ -412,13 +412,13 @@ class SplitCoVfasta
     void split();                  ///< Splits the input file into grouped PCR targets  
 
     /// Extracts a fragment from an MSA and reconstructs a nucleotide sequence
-    bool extract_msa_seq(const msa_seq_t &full_msa_seq,              ///< Full MSA sequence, including the gaps that make the alignment
+    static bool extract_msa_seq(const msa_seq_t &full_msa_seq,              ///< Full MSA sequence, including the gaps that make the alignment
                                msa_seq_t &msa_fragment,              ///< Output MSA fragment
                              oligo_seq_t &reconstructed_seq,         ///< Output reconstructed nucleotide sequence
                                     long msa_beg,                    ///< MSA beginning position
                                     long msa_end,                    ///< MSA ending position
                                     int tent_len = 0                 ///< Tentative length for sequence reservation
-                       ) ;
+                       );
     
  private:
     /// Updates a target count using parsed metadata
@@ -429,11 +429,11 @@ class SplitCoVfasta
 
     void split_msa( );         ///< Splits sequences based on MSA data
     void split_fasta( );       ///< Splits the FASTA sequences into groups
-    void set_ref_pos();        ///< Sets reference positions for the amplicon
+    void set_ref_seq();        ///< Sets reference positions for the amplicon
     void set_msa_ref_pos();    ///< Sets MSA reference positions for the amplicon
 
-    void parse_id_allnuc(const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
-    void parse_id       (const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
+    static void parse_id_allnuc(const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
+    static void parse_id       (const std::string& id, parsed_id& pid) ;  ///< parse the id of the original fasta record, only if not found in metadata
 
     void read_metadata();     ///< Reads metadata from the corresponding file
     

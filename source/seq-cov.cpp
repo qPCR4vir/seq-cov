@@ -47,8 +47,8 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
  bool PCRSplitter::quick_check(const oligo_seq_t &target, const oligo &primer, long offset) // check if the primer matches the target at the expected position
  {
-    int pr_beg = primer.ref_beg + offset;
-    int len = primer.seq.size();
+    long pr_beg = primer.ref_beg + offset;
+    long len = primer.seq.size();
     if (pr_beg < 0 || pr_beg + len > target.size()) return false;  // primer is out of the target
     int mm = len - primer.match;  // maximum number of mismatches
     if (mm < 1) mm = 1;  // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
@@ -62,7 +62,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
 
 // struct SplitGene
  
-PCRSplitter::PCRSplitter(SplitCoVfasta &parent, std::string pcr_name)
+PCRSplitter::PCRSplitter(SplitCoVfasta const &parent, std::string pcr_name)
         : parent{parent}, pcr_name{pcr_name}
 {
     
@@ -668,18 +668,18 @@ void PCRSplitter::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& ful
 //     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
 std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const auto& record)
 {
-    const oligo_seq_t& full_target = record.sequence();
+    oligo_seq_t const & full_target = record.sequence();
     count++;
     oligo& fw_pr = f_primers[extern_forw_idx];
 
     for (long pos : hint1)                                              // first try hint1: most frecuent single amplicon positions with quick check
     {
-        if (pos >= full_target.size()) continue;  // out of the sequence
-        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\quick_check the forward primer at the Hint1 position: " << pos << "\n";
+        if (pos >= full_target.size()) continue;               // out of the sequence
+        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << '\n' << pcr_name << ": quick_check the forward primer at the Hint1 position: " << pos << "\n";
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint1 position: " << pos << "\n";
-        if constexpr (debugging >= debugging_INFO)     amplicon_pos_beg[pos]++;
+        if constexpr (debugging >= debugging_INFO)   amplicon_pos_beg[pos]++;
 
         long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
@@ -1108,7 +1108,7 @@ bool SplitCoVfasta::extract_msa_seq(const msa_seq_t &full_msa_seq,
                         long msa_beg, long msa_end, int tent_len )  // = 0
 {
     seqan3::debug_stream << "\nReconstructing sequence from MSA pos " << msa_beg << " to " << msa_end << '\n';
-    seqan3::debug_stream <<  msa_pos.size() << '\t';
+    //seqan3::debug_stream <<  msa_pos.size() << '\t';
 
     reconstructed_seq.clear();
     if (tent_len) reconstructed_seq.reserve(tent_len);
@@ -1145,17 +1145,16 @@ bool SplitCoVfasta::extract_msa_seq(const msa_seq_t &full_msa_seq,
     return true;
 }
 
-void SplitCoVfasta::set_ref_pos( )  // set reference sequence , todo: set positions of primers?
+void SplitCoVfasta::set_ref_seq( )  // set reference sequence , todo: set/check positions of primers?
 {
-    // Initialise a file input object with a FASTA file.
     seqan3::sequence_file_input<OLIGO> file_in{dir / "MN908947.3.fasta"};
 
-    auto&& ref_rec = *file_in.begin();
-
+    for (auto&& ref_rec: file_in)
+   { 
     ref_seq = std::move(ref_rec.sequence());
-
     seqan3::debug_stream << "\n\nReference: " << ref_rec.id() << ", reference lenth = " << ref_seq.size() << '\n';
-
+        return;
+   }
 }
 
 void SplitCoVfasta::set_msa_ref_pos( )
@@ -1590,6 +1589,8 @@ GISAID_format SplitCoVfasta::check_format()
 
 void SplitCoVfasta::split( )
 {
+    // launched inmediatelly after the SplitCoVfasta constructor, and teh whole SplitCoVfasta is destructed after this call.
+    // No data race posible
     // use chrono to logg the time reading metadata and splitting
     auto start = std::chrono::high_resolution_clock::now();
     try
@@ -1640,7 +1641,7 @@ void SplitCoVfasta::split( )
 
 void SplitCoVfasta::split_fasta( )
 {
-    set_ref_pos();                                        // load the reference sequence
+    set_ref_seq();                                        // load the reference sequence
     
     seqan3::sequence_file_input<OLIGO> file_in{fasta};    // Initialise a file input object with a FASTA file.
 
@@ -1668,6 +1669,10 @@ void SplitCoVfasta::split_fasta( )
         //for (auto & pcr : pcrs)  
         std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](PCRSplitter& pcr) 
         {
+                // each in paralell PCR check recive a const reference to the record, 
+                // and modify only that PCR specific data. No data race posible.
+                // Every PCR keep a link to the parent SplitCoVfasta object, but it is const, read only. 
+
             if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Trace before check_rec: " ;
 
             auto tcop = pcr.check_rec(record);  // check in parallel for each PCR/target - that tc belong to current PCR - no data race
@@ -1704,7 +1709,7 @@ void SplitCoVfasta::split_fasta( )
             //std::multimap<int, int, std::greater<>> inverted{pcr.amplicon_pos_beg.begin(), pcr.amplicon_pos_beg.end()};
             seqan3::debug_stream << "Amplicon_reference pos beg: " << pcr.ref_beg << '\n'; 
             for (auto& [pos, count] : pcr.amplicon_pos_beg)
-                seqan3::debug_stream << "pos: " << pos << ", count: " << count << '\n';
+                seqan3::debug_stream << "pos: "  << pos << ", count: " << count << '\n';
         }
     }
 
