@@ -599,11 +599,11 @@ void PCRSplitter::evaluate_msa_target(target_q & tq, const msa_seq_t& full_targe
     {
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
-    //for (pattern_q& pq : tq.patterns)   
-    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    for (pattern_q& pq : tq.patterns)   
+    //std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     {
         evaluate_msa_target_primer(pq, full_target);
-    });
+    }//);
     target_msa_pattern(tq, full_target);
 
     for (auto & pq : tq.patterns)
@@ -830,11 +830,12 @@ void PCRSplitter::evaluate_target(target_q  &tq, const oligo_seq_t &full_target,
         tq.patterns.emplace_back(primer);  // registering/creating the pattern_q is cheap and fast but difficult to parallelize
     }
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nGoing to evaluate a new target sequence for " << tq.patterns.size() << " primer pattenrs\n";
-    //for (pattern_q& pq : tq.patterns)   
-    std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
+    for (pattern_q& pq : tq.patterns)   
+    //std::for_each(std::execution::par_unseq, tq.patterns.begin(), tq.patterns.end(), [&](pattern_q &pq)
     {
         evaluate_target_primer(pq, full_target, offset);
-    });
+    }
+    //);
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nGoing to evaluate the target sequence self " << tq.patterns.size() << '\n';
     target_pattern(tq, full_target, ampl_beg);
 
@@ -1697,8 +1698,8 @@ void SplitCoVfasta::split_fasta( )
         }
         if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
-        //for (auto & pcr : pcrs)  
-        std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](PCRSplitter& pcr) 
+            for (auto & pcr : pcrs)  
+            //std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](PCRSplitter& pcr) 
         {
                 // each in paralell PCR check recive a const reference to the record, 
                 // and modify only that PCR specific data. No data race posible.
