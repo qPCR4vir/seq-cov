@@ -292,7 +292,6 @@ long find_primer(const oligo_seq_t& target, const oligo& primer, auto& config)
 SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
 {
     // new, unknown seq. We need to find the right position of the target sequence
-    // less than 1% of the seq. May be around 50k?
     SeqPos sg;
     oligo & fw_pr = f_primers[extern_forw_idx];
     
@@ -362,7 +361,7 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
     }
     if (sg.beg != sg.npos && sg.end != sg.npos) return sg;    // we have both primers but still not the ref_len
     sg.beg = sg.end = sg.npos;                                // mark as not found !! 
-    if constexpr (debugging >= debugging_DEBUG) seqan3::debug_stream << pcr_name + " PCR don't match the external primers in the Target region of length: " << target.size() << '\n';
+    if constexpr (debugging >= debugging_TRACE) seqan3::debug_stream << pcr_name + " PCR don't match the external primers in the Target region of length: " << target.size() << '\n';
     return sg;
 }
 
@@ -1350,11 +1349,18 @@ void SplitCoVfasta::read_metadata()
     size_t lines_parsed = 0;                // todo print progress every 100k? lines or so
     size_t duplicates = 0;                  // count duplicates
     size_t empty_virusname = 0;             // count empty virus names
+    
+    long m{(1L<<19)-1};                            // for progress printing
+    seqan3::debug_stream << "\nchunk - m= " << m << "\n" ; 
 
     while (std::getline(metadata_file, line))
     {
         if (line.empty()) continue;
-        ++lines_parsed;
+        if (!(++lines_parsed & m))                         // progress indication every 2^19 (m) sequences 
+        {
+            if constexpr (debugging >= debugging_INFO) seqan3::debug_stream << "\tlines_parsed= " << lines_parsed  << "\n" ;
+        }
+        //if constexpr (debugging >= break_by) if (lines_parsed >= break_point) break;     // set for debugging only  !!!!!!!!!!!! 
         
         // 2.1. Tokenize this line by tab into `cols` as string_views
         cols.clear();
@@ -1626,7 +1632,7 @@ void SplitCoVfasta::split( )
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error{ std::string("ERROR splitting the fasta file") + e.what()};
+        throw std::runtime_error{ std::string("ERROR splitting the fasta file - ") + e.what()};
     }
     catch(...)
     {
