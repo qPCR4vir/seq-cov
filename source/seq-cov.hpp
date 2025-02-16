@@ -36,9 +36,9 @@ enum {  debugging_NOT_USED= 0,
         debugging_DEBUG   = 40, 
         debugging_TRACE   = 80,
         debugging_ALL     = 1000};
-constexpr auto debugging   = debugging_DEBUG;  // How much debug info to print todo: move to .cpp?
-constexpr auto break_by    =  debugging_INFO;
-constexpr long break_point =  170000;
+constexpr auto debugging   = debugging_INFO;  // How much debug info to print todo: move to .cpp?
+constexpr auto break_by    =  debugging_DEBUG;
+constexpr long break_point =  1700000;
 
 // todo grap most std::cout and seqan3::debug_stream with  if constexpr (debugging) { }
 
@@ -210,6 +210,10 @@ struct parsed_id
     std::string clade;
     std::string pango;
     std::string pango_version;
+    
+    void parse_id_allnuc(const std::string& id);  ///< parse the id of an original fasta record
+    void parse_id       (const std::string& id);  ///< parse the id of an original fasta record
+
 };
 
 using Metadata = std::unordered_map<std::string, parsed_id>;  // isolate -> metadata
@@ -248,6 +252,9 @@ struct target_count
     std::unordered_map<int, cov::year_count> years;
     target_q target;
     int count = 0;
+
+    /// Updates a target count using parsed_id metadata
+    void update_counts_from(parsed_id& pid);  
 };
 enum class GISAID_format {fasta, gene_msa, msa, allprot, allaa, allcodon, allnucprot, allnucaa, allnucprotcodon, allnucprotcodonaa};
 class SplitCoVfasta;
@@ -444,7 +451,7 @@ class SplitCoVfasta
     std::string           from, to;                                   ///< Date range  
     bool                  check_date = !(from.empty() && to.empty()); ///< Flag to determine whether to check dates
 
-    int                   flank {5};          ///< Flanking region size
+    int                   flank {5};          ///< Flanking region size - not used ?
     int                   crit_term_nt {4};   ///< Critical terminal nucleotide threshold
     int                   crit_mm {3};        ///< Critical mismatch threshold
     int                   crit_N {3};         ///< Critical ambiguous nucleotide threshold
@@ -478,7 +485,7 @@ class SplitCoVfasta
     {}
 
     /// Adds a PCR entry and reads its oligo definitions
-    void add_pcr(const std::filesystem::path& oligos,    ///< Path to the oligos file
+    void add_pcr(const std::filesystem::path& oligos,     ///< Path to the oligos file
                                    std::string pcr_name,  ///< PCR name
                                    std::string fw = "",   ///< Optional forward primer override
                                    std::string rv = ""    ///< Optional reverse primer override
@@ -492,7 +499,7 @@ class SplitCoVfasta
     void split();                  ///< Splits the input file into grouped PCR targets  
 
     /// Extracts a fragment from an MSA and reconstructs a nucleotide sequence
-    static bool extract_msa_seq(const msa_seq_t &full_msa_seq,              ///< Full MSA sequence, including the gaps that make the alignment
+    static bool extract_msa_seq(const msa_seq_t &full_msa_seq,       ///< Full MSA sequence, including the gaps that make the alignment
                                msa_seq_t &msa_fragment,              ///< Output MSA fragment
                              oligo_seq_t &reconstructed_seq,         ///< Output reconstructed nucleotide sequence
                                     long msa_beg,                    ///< MSA beginning position
@@ -501,19 +508,11 @@ class SplitCoVfasta
                        );
     
  private:
-    /// Updates a target count using parsed metadata
-    void update_target_count(target_count& tc,       ///< Target count to update
-                             parsed_id& pid          ///< Parsed metadata structure
-                            );  
-
 
     void split_msa( );         ///< Splits sequences based on MSA data
     void split_fasta( );       ///< Splits the FASTA sequences into groups
     void set_ref_seq();        ///< Sets reference positions for the amplicon
     void set_msa_ref_pos();    ///< Sets MSA reference positions for the amplicon
-
-    static void parse_id_allnuc(const std::string& id, parsed_id& pid);  ///< parse the id of the original fasta record, only if not found in metadata
-    static void parse_id       (const std::string& id, parsed_id& pid) ;  ///< parse the id of the original fasta record, only if not found in metadata
 
     void read_metadata();     ///< Reads metadata from the corresponding file
     

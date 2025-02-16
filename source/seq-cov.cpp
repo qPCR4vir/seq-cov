@@ -302,7 +302,7 @@ SeqPos PCRSplitter::find_ampl_pos(const oligo_seq_t& target)
     seqan3::align_cfg::scoring_scheme     scheme{seqan3::nucleotide_scoring_scheme{seqan3::match_score   { 1}, 
                                                                                    seqan3::mismatch_score{-1}}};
     seqan3::align_cfg::gap_cost_affine gap_costs{seqan3::align_cfg::open_score{0}, 
-                                                    seqan3::align_cfg::extension_score{-1}};
+                                                 seqan3::align_cfg::extension_score{-1}};
     auto config = method | scheme | gap_costs | output_config;
     auto filter_v = std::views::filter( [&](auto && res) { return res.score() >= fw_pr.match; });
 
@@ -697,7 +697,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     if (full_target.size() > hint2.beg) try                                         // found the right position inside the Hint2 region
     {
         long end = std::min<long>(full_target.size(), hint2.end);
-        
+
         SeqPos sg = find_ampl_pos({full_target.begin() + hint2.beg, 
                                    full_target.begin() + end      });
         
@@ -753,7 +753,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     // return std::nullopt;    
 
     if (full_target.size() > hint4.beg) try                                                  // found the right position inside the Hint4 region
-    {
+    {      
         long end = std::min<long>(full_target.size(), hint4.end);
         SeqPos sg = find_ampl_pos({full_target.begin()+hint4.beg, 
                                    full_target.begin()+end});
@@ -784,8 +784,8 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
             << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    
-    // return std::nullopt;    
+
+    return std::nullopt;    
 
     try                                                                                       // search full_target
     {
@@ -1167,8 +1167,8 @@ void SplitCoVfasta::set_ref_seq( )  // set reference sequence , todo: set/check 
 
     for (auto&& ref_rec: file_in)
    { 
-    ref_seq = std::move(ref_rec.sequence());
-    seqan3::debug_stream << "\n\nReference: " << ref_rec.id() << ", reference lenth = " << ref_seq.size() << '\n';
+        ref_seq = std::move(ref_rec.sequence());
+        seqan3::debug_stream << "\n\nReference: " << ref_rec.id() << ", reference lenth = " << ref_seq.size() << '\n';
         return;
    }
 }
@@ -1222,7 +1222,7 @@ void SplitCoVfasta::set_msa_ref_pos( )
 
 }
 
-void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
+void parsed_id::parse_id(const std::string& id) 
 {
     // parse the id of the fasta record, like:
     // hCoV-19/USA/CO-CDPHE-2010040598/2020|2020-10-02|2021-09-04 
@@ -1235,18 +1235,19 @@ void SplitCoVfasta::parse_id(const std::string& id, parsed_id& pid)
     std::size_t isolate_end = id.find('/', isolate_beg)   - 1;
     std::size_t isolate_len = isolate_end - isolate_beg   + 1;
 
-    pid.country = id.substr(country_beg, country_len);
-    pid.isolate = id.substr(isolate_beg, isolate_len);
+    country = id.substr(country_beg, country_len);
+    isolate = id.substr(isolate_beg, isolate_len);
 
     // parse the two dates and todo take the early as the collection date in pid.year, pid.month, pid.day
     std::size_t date_beg = id.find('|', isolate_end) + 1;
     std::size_t date_end = id.find('|', date_beg) - 1;
     std::size_t date_len = date_end - date_beg + 1;
     std::string date1 = id.substr(date_beg, date_len);
+    
     // save the collection date in pid.year, pid.month, pid.day
-    pid.year  = std::stoi(date1.substr(0, 4));
-    pid.month = std::stoi(date1.substr(5, 2));
-    pid.day   = std::stoi(date1.substr(8, 2));/* code */
+    year  = std::stoi(date1.substr(0, 4));
+    month = std::stoi(date1.substr(5, 2));
+    day   = std::stoi(date1.substr(8, 2));/* code */
   }
     catch(const std::exception& e)
     {
@@ -1469,7 +1470,7 @@ void SplitCoVfasta::read_metadata()
                     auto fc3 = std::from_chars(d + 8, d +  9, pid.day  );  
                 }
             }
-// 2024-4-2
+            // 2024-4-2
             else if (date_sv.size() == 8)                              // e.g. "2024-4-2"
             {
                 auto d = date_sv.data();
@@ -1553,7 +1554,7 @@ void SplitCoVfasta::read_metadata()
                              << ", date_errors=" << date_errors << '\n';
 }
 
-void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
+void parsed_id::parse_id_allnuc(const std::string& id) 
 {   
     // >hCoV-19/Wuhan/WIV04/2019|EPI_ISL_402124|2019-12-30|China
     // d_2019-12-30_x_1_c_China - Wuhan_EPI_02124_i_WIV04_p_E_Sarbeco_F2_Q_0_mm_0_N_0_crit_0_pat_......................
@@ -1578,23 +1579,22 @@ void SplitCoVfasta::parse_id_allnuc(const std::string& id, parsed_id& pid)
     std::size_t day_beg     = month_beg + 3;  
     std::size_t region_beg  = day_beg   + 3;
 
-    pid.isolate = id.substr(isolate_beg, isolate_len);                 
-    pid.EPI_ISL = id.substr(EPI_ISL_beg, EPI_ISL_len); 
-    pid.country = id.substr(region_beg) + " - " + id.substr(country_beg, country_len) ;  
+    isolate = id.substr(isolate_beg, isolate_len);                 
+    EPI_ISL = id.substr(EPI_ISL_beg, EPI_ISL_len); 
+    country = id.substr(region_beg) + " - " + id.substr(country_beg, country_len) ;  
 
     auto s = id.data() ;
     auto y = s + year_beg ;
     auto m = s + month_beg;
     auto d = s + day_beg  ;    
     
-    std::from_chars(y, m    , pid.year );   
-    std::from_chars(m, d    , pid.month); 
-    std::from_chars(d, d + 3, pid.day  );
+    std::from_chars(y, m    , year );   
+    std::from_chars(m, d    , month); 
+    std::from_chars(d, d + 3, day  );
 
-     seqan3::debug_stream << "\n" << pid.isolate << " - EPI: " << pid.EPI_ISL << " - " 
-                         << pid.year << " - " << pid.month << " - " << pid.day 
-                         << " - " << pid.country << '\n' ; 
-
+     seqan3::debug_stream << "\n" << isolate << " - EPI: " << EPI_ISL << " - " 
+                          << year << " - "   << month << " - " << day 
+                         << " - " << country << '\n' ; 
 }
 
 // check format by reading and checking the first record. todo: too simple, make more checks??
@@ -1691,7 +1691,6 @@ void skip_bad(auto& it, const auto& end)
     }
 }
 
-
 void SplitCoVfasta::split_fasta( )
 {
     set_ref_seq();                                        // load the reference sequence
@@ -1707,45 +1706,45 @@ void SplitCoVfasta::split_fasta( )
     try { it = file_in.begin(); } catch(...) {skip_bad(it, file_in.end());}            // some seq. are proteins not nucleotides
 
     while(it != file_in.end())  // read each sequence in the file sequencially !! One by one record!
-    {
+    {    
             auto && record = *it;
             id = record.id();    
 
-        if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\n" << record.id() << '\n' ;
+            if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\n" << record.id() << '\n' ;
+            
+            std::string_view virus_name = record.id();
+            virus_name = virus_name.substr(0, virus_name.find('|'));          // if not found, keep the whole virus_name
 
-        std::string_view virus_name = record.id();
-        virus_name = virus_name.substr(0, virus_name.find('|'));
+            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Virus name: " << virus_name << '\n';
 
-        if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Virus name: " << virus_name << '\n';
+            parsed_id& pid = metadata[std::string{virus_name}];       // reference to the (posibly newly inserted) parsed_id
 
-        parsed_id& pid = metadata[std::string{virus_name}];  // reference to the (posibly newly inserted) parsed_id
-
-        if (pid.isolate.empty())                             // if isolate is not set, parse the id
-        {
-            if constexpr (debugging >= debugging_WARNING) seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
-            parse_id(record.id(), pid);
-        }
-        if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
+            if (pid.isolate.empty())                                  // if isolate was not set from metadata file, parse the id
+            {
+                if constexpr (debugging >= debugging_WARNING) seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
+                pid.parse_id(record.id());
+            }
+            if constexpr (debugging >= debugging_TRACE+3)        seqan3::debug_stream << "Parsed id: " << pid.isolate << '\n';
 
             for (auto & pcr : pcrs)  
             //std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](PCRSplitter& pcr) 
-        {
+            {
                 // each in paralell PCR check recive a const reference to the record, 
                 // and modify only that PCR specific data. No data race posible.
                 // Every PCR keep a link to the parent SplitCoVfasta object, but it is const, read only. 
 
-            if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Trace before check_rec: " ;
+                if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Trace before check_rec: " ;
 
-            auto tcop = pcr.check_rec(record);  // check in parallel for each PCR/target - that tc belong to current PCR - no data race
-            if (tcop) 
-            {
-                target_count& tc = *tcop;
-                if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
-            
-                update_target_count(tc, pid);
-            }
-            else 
-            {if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec FAILED\n" ;;}
+                auto tcop = pcr.check_rec(record);  // check in parallel for each PCR/target - that tc belong to current PCR - no data race
+                if (tcop) 
+                {
+                    target_count& tc = *tcop;
+                    if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec returning target_pattern: " << tc.target.target_pattern <<"\n" ;
+                
+                    tc.update_counts_from(pid);
+                }
+                else 
+                {if constexpr (debugging >= debugging_TRACE)   seqan3::debug_stream << "Trace after check_rec FAILED\n" ;;}
             }
             //);  
 
@@ -1789,7 +1788,7 @@ void SplitCoVfasta::split_fasta( )
             seqan3::debug_stream << "Detected with Hint4: " << pcr.count_hint4 << '\n';
             seqan3::debug_stream << "Detected with full seq: " << pcr.count_full << '\n';
             seqan3::debug_stream << "Not detected: "         << pcr.count_not_found << '\n';
-        }
+            }
     }
 
 }
@@ -1818,7 +1817,7 @@ void SplitCoVfasta::split_msa( )
         {
             if constexpr (debugging)
                 seqan3::debug_stream << "Not found in metadata. Going Parsing id: " << record.id() << '\n';
-            parse_id_allnuc(record.id(), pid);
+            pid.parse_id_allnuc(record.id());
         }
 
         //for (auto & pcr : pcrs)   
@@ -1859,11 +1858,11 @@ void SplitCoVfasta::split_msa( )
 
 }
 
-void SplitCoVfasta::update_target_count(target_count& tc, parsed_id& pid)
+void target_count::update_counts_from(parsed_id& pid)
 {
-    if (!tc.count) return;
+    if (!count) return;
 
-    year_count& yc = tc.years[pid.year];
+    year_count& yc = years[pid.year];
     yc.count++;
     
     month_count& mc = yc.months[pid.month];
