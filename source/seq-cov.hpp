@@ -299,6 +299,9 @@ struct PCRSplitter
     long count_hint1{0}, count_hint2{0}, count_hint3{0}, count_hint4{0}, 
          count_full{0}, count_not_found{0};  ///< Count of sequences detected by hints
 
+// create a counter for the not found sequences gruoped every 1000 nt lenth 
+    std::map<int, int> not_found_lenghts;
+
     seqan3::nucleotide_scoring_scheme<int8_t> mismatch; ///< Scoring scheme for mismatches (default is hamming distance)
 
     SplitCoVfasta const &parent;             ///< Parent SplitCoVfasta instance

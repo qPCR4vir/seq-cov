@@ -833,7 +833,10 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     finish = std::chrono::high_resolution_clock::now();
     full_seq_time_wasted += finish - start;
     if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in this target\n";
+// todo: try to align the reference amplicon to the full_target sequence
+    // create a counter for the not found sequences gruoped every 1000 nt lenth  not_found[full_target.size()/1000]++;
     count_not_found++;
+not_found_lenghts[full_target.size()/1000]++;
     return std::nullopt;
 }
 
