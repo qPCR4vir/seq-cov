@@ -289,6 +289,12 @@ struct PCRSplitter
                      hint3;         ///< Hint for most frecuent amplicon position out of Hint2
     SeqPos           hint2{-1,-1},  ///< Hint for most frecuent amplicon region
                      hint4{-1,-1};  ///< Hint for region with almost all the rest of the amplicon positions   
+// time used or wasted on each type of hint (chrono high resolution)
+    std::chrono::high_resolution_clock::duration hint1_time_used, hint1_time_wasted, 
+                                                 hint2_time_used, hint2_time_wasted, 
+                                                 hint3_time_used, hint3_time_wasted, 
+                                                 hint4_time_used, hint4_time_wasted,
+                                                 full_seq_time_used, full_seq_time_wasted;
 
     long count_hint1{0}, count_hint2{0}, count_hint3{0}, count_hint4{0}, 
          count_full{0}, count_not_found{0};  ///< Count of sequences detected by hints
