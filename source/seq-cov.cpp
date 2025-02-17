@@ -49,7 +49,7 @@ struct dna_deg : seqan3::sequence_file_input_default_traits_dna
  {
     long pr_beg = primer.ref_beg + offset;
     long len = primer.seq.size();
-    if (pr_beg < 0 || pr_beg + len > target.size()) return false;             // primer is out of the current target
+    if (pr_beg < 0 || pr_beg + len > target.size()) return false;             // primer is out of the current target... but (pos + ref_len < full_target.size())
     int mm = len - primer.match;                                              // mm - not allowed number of mismatches
     if (mm < 0) mm = 0;                                   // throw std::runtime_error{"Primer " + primer.name + " has incorrect number of permisible mismatches: " 
     for (int i = 0; i < len - mm; ++i)        // dont check the last, allowed mismatches
@@ -676,7 +676,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 
     for (long pos : hint1)                                              // first try hint1: most frecuent single amplicon positions with quick check
     {
-        if (pos >= full_target.size()) continue;               // out of the sequence
+        if (pos + ref_len >= full_target.size()) continue;               // out of the sequence
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << '\n' << pcr_name << ": quick_check the forward primer at the Hint1 position: " << pos << "\n";
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
         
@@ -684,9 +684,8 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if constexpr (debugging >= debugging_NOT_USED)   amplicon_pos_beg[pos]++;
         count_hint1++;
 
-        long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
-                                                            full_target.begin()+end}, target_count{}); // todo: register the new position !!!!!
+                                                            full_target.begin()+pos + ref_len}, target_count{});  
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
         target_c.count++;
@@ -701,7 +700,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 
     // return std::nullopt;    
 
-    if (full_target.size() > hint2.beg) try                                         // found the right position inside the Hint2 region
+    if (full_target.size() > hint2.beg + ref_len) try                                         // found the right position inside the Hint2 region
     {
         long end = std::min<long>(full_target.size(), hint2.end);
 
@@ -712,7 +711,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         {
             sg.beg = std::max<long>(0L                , hint2.beg + sg.beg);
             sg.end = std::min<long>(full_target.size(), hint2.beg + sg.end);
-            if (sg.beg < sg.end)
+            if (ref_len <= sg.end - sg.beg) // the amplicon is long enough
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint2 region position: " << sg.beg << " to " << sg.end << std::endl;
                 if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
@@ -742,16 +741,15 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 
     for (long pos : hint3)                                                          // try hint3: less frecuent single amplicon positions with quick check
     {
-        if (pos >= full_target.size()) continue;  // out of the sequence
+        if (pos + ref_len >= full_target.size()) continue;  // out of the sequence
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint3 position: " << pos << "\n";
         if constexpr (debugging >= debugging_NOT_USED)     amplicon_pos_beg[pos]++;
         count_hint3++;
 
-        long end = std::min<long>(full_target.size(), pos + ref_len);
         const auto& [it, is_new_seq] = grouped.try_emplace({full_target.begin()+pos, 
-                                                            full_target.begin()+end}, target_count{}); 
+                                                            full_target.begin()+pos + ref_len}, target_count{}); 
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos);                            // 2-known position but new sequence
         target_c.count++;
@@ -764,7 +762,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
 
     // return std::nullopt;    
 
-    if (full_target.size() > hint4.beg) try                                                  // found the right position inside the Hint4 region
+    if (full_target.size() > hint4.beg + ref_len) try                                                  // found the right position inside the Hint4 region
     {      
         long end = std::min<long>(full_target.size(), hint4.end);
         SeqPos sg = find_ampl_pos({full_target.begin()+hint4.beg, 
@@ -774,7 +772,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         {
             sg.beg = std::max<long>(0L                , hint4.beg + sg.beg);
             sg.end = std::min<long>(full_target.size(), hint4.beg + sg.end);
-            if (sg.beg < sg.end)
+            if (ref_len <= sg.end - sg.beg) // the amplicon is long enough
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
@@ -805,11 +803,11 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     {
         SeqPos sg = find_ampl_pos(full_target);
         
-        if (sg.beg != sg.npos && sg.end != sg.npos && sg.beg < sg.end)  // found the right position inside the Hint4 region
+        if (sg.beg != sg.npos && sg.end != sg.npos && sg.beg < sg.end)  // found the right position 
         {
             sg.beg = std::max<long>(0L                , sg.beg);
             sg.end = std::min<long>(full_target.size(), sg.end);
-            if (sg.beg < sg.end)  // found the right position inside the Hint2 region
+            if (ref_len <= sg.end - sg.beg) // the amplicon is long enough, 
             {
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
@@ -1735,7 +1733,7 @@ void SplitCoVfasta::split_fasta( )
 
             if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "Virus name: " << virus_name << '\n';
 
-            parsed_id& pid = metadata[std::string{virus_name}];       // reference to the (posibly newly inserted) parsed_id
+            parsed_id& pid = metadata[std::string{virus_name}]; // reference to the (posibly newly inserted) parsed_id, always stable living in metadata map
 
             if (pid.isolate.empty())                                  // if isolate was not set from metadata file, parse the id
             {
@@ -1846,7 +1844,7 @@ void SplitCoVfasta::split_msa( )
         std::for_each(std::execution::par_unseq, pcrs.begin(), pcrs.end(), [&](auto& pcr) 
         {
             target_count& tc = pcr.check_msa_rec(record);
-            update_target_count(tc, pid);
+            tc.update_counts_from(pid);
         });
 
         if (!(++t & m))                      // print a dot every 2^18 sequences for progress indication
