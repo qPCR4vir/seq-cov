@@ -44,6 +44,9 @@ constexpr long break_point =  1700000;
 
 namespace cov
 {
+using clock      = std::chrono::steady_clock;
+using time_point = decltype(clock::now());
+using duration   = std::chrono::duration<double> ;
 
 /** Hashing a range of characters.
  * 
@@ -289,15 +292,22 @@ struct PCRSplitter
                      hint3;         ///< Hint for most frecuent amplicon position out of Hint2
     SeqPos           hint2{-1,-1},  ///< Hint for most frecuent amplicon region
                      hint4{-1,-1};  ///< Hint for region with almost all the rest of the amplicon positions   
-// time used or wasted on each type of hint (chrono high resolution)
-    std::chrono::high_resolution_clock::duration hint1_time_used, hint1_time_wasted, 
-                                                 hint2_time_used, hint2_time_wasted, 
-                                                 hint3_time_used, hint3_time_wasted, 
-                                                 hint4_time_used, hint4_time_wasted,
-                                                 full_seq_time_used, full_seq_time_wasted;
+    // time used or wasted on each type of hint (chrono high resolution?)
 
-    long count_hint1{0}, count_hint2{0}, count_hint3{0}, count_hint4{0}, 
-         count_full{0}, count_not_found{0};  ///< Count of sequences detected by hints
+    duration hint1_time_used{},    hint1_time_wasted{}, 
+             hint2_time_used{},    hint2_time_wasted{}, 
+             hint3_time_used{},    hint3_time_wasted{}, 
+             hint4_time_used{},    hint4_time_wasted{},
+             full_seq_time_used{}, full_seq_time_wasted{},
+             amplicon_time_used{}, amplicon_time_wasted{};  ///< todo: Time used and wasted on amplicon alignment to target
+
+    long count_hint1{0}, 
+         count_hint2{0}, 
+         count_hint3{0}, 
+         count_hint4{0}, 
+         count_full{0}, 
+         count_amplicon{0},
+         count_not_found{0};  ///< Count of sequences detected by hints
 
 // create a counter for the not found sequences gruoped every 1000 nt lenth 
     std::map<int, int> not_found_lenghts;

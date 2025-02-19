@@ -671,7 +671,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     count++;
     oligo& fw_pr = f_primers[extern_forw_idx];
     // high_resolution_clock clock start
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    time_point start = clock::now();
 
 
     for (long pos : hint1)                                              // first try hint1: most frecuent single amplicon positions with quick check
@@ -679,6 +679,8 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if (pos + ref_len >= full_target.size()) continue;               // out of the sequence
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << '\n' << pcr_name << ": quick_check the forward primer at the Hint1 position: " << pos << "\n";
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
+        // add duration to used time  
+        hint1_time_used += clock::now() - start;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint1 position: " << pos << "\n";
         if constexpr (debugging >= debugging_NOT_USED)   amplicon_pos_beg[pos]++;
@@ -689,12 +691,10 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos); // 2-known position but new sequence
         target_c.count++;
-        // add high_resolution duration to used time  
-        hint1_time_used += std::chrono::high_resolution_clock::now() - start;
         return std::ref(target_c);          
     }
-    // add high_resolution duration to wasted time 
-    std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
+    // add duration to wasted time 
+    time_point finish = clock::now();
     hint1_time_wasted += finish - start;
     start = finish;
 
@@ -713,6 +713,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.end = std::min<long>(full_target.size(), hint2.beg + sg.end);
             if (ref_len <= sg.end - sg.beg) // the amplicon is long enough
             {
+                hint2_time_used += clock::now() - start;
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint2 region position: " << sg.beg << " to " << sg.end << std::endl;
                 if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
                 count_hint2++;
@@ -722,7 +723,6 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg); // New position and new sequence
                 target_c.count++;
-                hint2_time_used += std::chrono::high_resolution_clock::now() - start;
                 return std::ref(target_c);     
             }
         }
@@ -733,7 +733,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
           << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    finish = std::chrono::high_resolution_clock::now();
+    finish = clock::now();
     hint2_time_wasted += finish - start;
     start = finish;
 
@@ -743,6 +743,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
     {
         if (pos + ref_len >= full_target.size()) continue;  // out of the sequence
         if (!quick_check(full_target, fw_pr, pos - ref_beg)) continue;
+        hint3_time_used += clock::now() - start;
         
         if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the forward primer at the Hint3 position: " << pos << "\n";
         if constexpr (debugging >= debugging_NOT_USED)     amplicon_pos_beg[pos]++;
@@ -753,10 +754,9 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         target_count & target_c = it->second;
         if (is_new_seq) evaluate_target(target_c.target, full_target, pos);                            // 2-known position but new sequence
         target_c.count++;
-        hint3_time_used += std::chrono::high_resolution_clock::now() - start;
         return std::ref(target_c);          
     }
-    finish = std::chrono::high_resolution_clock::now();
+    finish = clock::now();
     hint3_time_wasted += finish - start;
     start = finish;
 
@@ -774,6 +774,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.end = std::min<long>(full_target.size(), hint4.beg + sg.end);
             if (ref_len <= sg.end - sg.beg) // the amplicon is long enough
             {
+                hint4_time_used += clock::now() - start;
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_NOT_USED) amplicon_pos_beg[sg.beg]++;
                 count_hint4++;
@@ -783,7 +784,6 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);               // New position and new sequence
                 target_c.count++;
-                hint4_time_used += std::chrono::high_resolution_clock::now() - start;
                 return std::ref(target_c);   
             }   
         }
@@ -794,7 +794,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
             << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    finish = std::chrono::high_resolution_clock::now();
+    finish = clock::now();
     hint4_time_wasted += finish - start;
     start = finish;
     // return std::nullopt;    
@@ -809,6 +809,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
             sg.end = std::min<long>(full_target.size(), sg.end);
             if (ref_len <= sg.end - sg.beg) // the amplicon is long enough, 
             {
+                full_seq_time_used += clock::now() - start;
                 if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "\nFound the amplicon in Hint4 region position: " << sg.beg << " to " << sg.end << "\n";
                 if constexpr (debugging >= debugging_INFO) amplicon_pos_beg[sg.beg]++;
                 count_full++;
@@ -818,7 +819,6 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
                 target_count & target_c = it->second;
                 if (is_new_seq) evaluate_target(target_c.target, full_target, sg.beg);     // New position and new sequence
                 target_c.count++;
-                full_seq_time_used += std::chrono::high_resolution_clock::now() - start;
                 return std::ref(target_c);      
             }
         }
@@ -828,7 +828,7 @@ std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const
         if constexpr (debugging >= debugging_DEBUG)  seqan3::debug_stream << "ERROR: No amplicon found, becouse Error: " << e.what() 
             << " checking new target sequence: " << record.id() << " with seq:\n" << full_target <<  "\n";
     }
-    finish = std::chrono::high_resolution_clock::now();
+    finish = clock::now();
     full_seq_time_wasted += finish - start;
     if constexpr (debugging >= debugging_TRACE)  seqan3::debug_stream << "No amplicon found in this target\n";
 // todo: try to align the reference amplicon to the full_target sequence
@@ -1640,7 +1640,7 @@ void SplitCoVfasta::split( )
     // launched inmediatelly after the SplitCoVfasta constructor, and teh whole SplitCoVfasta is destructed after this call.
     // No data race posible
     // use chrono to logg the time reading metadata and splitting
-    auto start = std::chrono::high_resolution_clock::now();
+    time_point start = clock::now();
     try
     {
         check_format();
@@ -1655,7 +1655,7 @@ void SplitCoVfasta::split( )
         throw std::runtime_error{ "ERROR setting format or reading metadata"};
     }
     
-    auto stop_metadata = std::chrono::high_resolution_clock::now(); 
+    time_point stop_metadata = clock::now(); 
 
     try
     {
@@ -1672,19 +1672,15 @@ void SplitCoVfasta::split( )
     }
 
     // take time and logg in hours, minutes, seconds
-    auto stop_split = std::chrono::high_resolution_clock::now();
+    time_point stop_split = clock::now();
     
     // logg in hours, minutes, seconds: hh:mm:ss format
-    auto duration_metadata = std::chrono::duration_cast<std::chrono::seconds>(stop_metadata - start);
-    auto duration_split    = std::chrono::duration_cast<std::chrono::seconds>(stop_split    - stop_metadata);
+    duration duration_metadata = stop_metadata - start;
+    duration duration_split    = (stop_split    - stop_metadata);
     if constexpr (debugging >= debugging_INFO)
-        seqan3::debug_stream << "Reading metadata: " << duration_metadata.count() / 3600 << ':' 
-                                                     << (duration_metadata.count() % 3600) / 60 << ':' 
-                                                     << duration_metadata.count() % 60 << '\n';
+        seqan3::debug_stream << "Reading metadata: " << duration_metadata  << '\n';
     if constexpr (debugging >= debugging_INFO)
-        seqan3::debug_stream << "Split all sequences: " << duration_split.count() / 3600 << ':' 
-                                                        << (duration_split.count() % 3600) / 60 << ':' 
-                                                         << duration_split.count() % 60 << '\n';
+        seqan3::debug_stream << "Split all sequences: " << duration_split << '\n';
 }
 
 void skip_bad(auto& it, const auto& end)
@@ -1799,11 +1795,13 @@ void SplitCoVfasta::split_fasta( )
             seqan3::debug_stream << "Amplicon_reference pos beg: " << pcr.ref_beg << '\n'; 
             for (auto& [pos, count] : pcr.amplicon_pos_beg)
                 seqan3::debug_stream << "pos: "  << pos << ", count: " << count << '\n';
-            seqan3::debug_stream << "Detected with Hint1: " << pcr.count_hint1 << " used " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint1_time_used).count() << " s, wasted " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint1_time_wasted).count() << " s\n";
-            seqan3::debug_stream << "Detected with Hint2: " << pcr.count_hint2 << " used " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint2_time_used).count() << " s, wasted " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint2_time_wasted).count() << " s\n";
-            seqan3::debug_stream << "Detected with Hint3: " << pcr.count_hint3 << " used " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint3_time_used).count() << " s, wasted " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint3_time_wasted).count() << " s\n";
-            seqan3::debug_stream << "Detected with Hint4: " << pcr.count_hint4 << " used " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint4_time_used).count() << " s, wasted " << std::chrono::duration_cast<std::chrono::seconds>(pcr.hint4_time_wasted).count() << " s\n";
-            seqan3::debug_stream << "Detected with full seq: "<<pcr.count_full << " used " << std::chrono::duration_cast<std::chrono::seconds>(pcr.full_seq_time_used).count() << " s, wasted " << std::chrono::duration_cast<std::chrono::seconds>(pcr.full_seq_time_wasted).count() << " s\n";
+
+            seqan3::debug_stream << "Detected with Hint1: " << pcr.count_hint1 << " used " << pcr.hint1_time_used    << " s, wasted " << pcr.hint1_time_wasted << " s\n";
+            seqan3::debug_stream << "Detected with Hint2: " << pcr.count_hint2 << " used " << pcr.hint2_time_used    << " s, wasted " << pcr.hint2_time_wasted << " s\n";
+            seqan3::debug_stream << "Detected with Hint3: " << pcr.count_hint3 << " used " << pcr.hint3_time_used    << " s, wasted " << pcr.hint3_time_wasted << " s\n";
+            seqan3::debug_stream << "Detected with Hint4: " << pcr.count_hint4 << " used " << pcr.hint4_time_used    << " s, wasted " << pcr.hint4_time_wasted << " s\n";
+            seqan3::debug_stream << "Detected with full seq: "<<pcr.count_full << " used " << pcr.full_seq_time_used << " s, wasted " << pcr.full_seq_time_wasted << " s\n"; 
+            
             seqan3::debug_stream << "Not detected: "         << pcr.count_not_found << ", with lenths: \n";
             // print the not_found_lenghts
             for (auto& [len, count] : pcr.not_found_lenghts)
