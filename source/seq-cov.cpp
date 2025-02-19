@@ -667,6 +667,15 @@ void PCRSplitter::evaluate_msa_target_primer(pattern_q &pq, const msa_seq_t& ful
 //     and readjust the coordinates of the amplicon and repeat to check if we are now in 1- or 2-. 
 std::optional<std::reference_wrapper<target_count>> PCRSplitter::check_rec(const auto& record)
 {
+if constexpr (debugging >= debugging_VERBOSE)
+    if (ref_beg + ref_len > parent.ref_seq.size()) 
+        throw std::runtime_error{"Amplicon end position is out of the reference sequence: " 
+            + std::to_string(ref_beg) + " to " + std::to_string(ref_end)};
+    
+    if constexpr (debugging >= debugging_VERBOSE)
+    if (ref_beg < 0)    throw std::runtime_error{"Amplicon begin position is out of the reference sequence: " 
+        + std::to_string(ref_beg) + " to " + std::to_string(ref_end)};
+    
     oligo_seq_t const & full_target = record.sequence();
     count++;
     oligo& fw_pr = f_primers[extern_forw_idx];
@@ -840,6 +849,7 @@ not_found_lenghts[full_target.size()/1000]++;
 
 void PCRSplitter::evaluate_target(target_q  &tq, const oligo_seq_t &full_target, long ampl_beg)
 {
+    target_pattern(tq, full_target, ampl_beg);
     int offset = ampl_beg - ref_beg;
     for (oligo& primer : all_oligos)   
     {
@@ -853,7 +863,6 @@ void PCRSplitter::evaluate_target(target_q  &tq, const oligo_seq_t &full_target,
     }
     );
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nGoing to evaluate the target sequence self " << tq.patterns.size() << '\n';
-    target_pattern(tq, full_target, ampl_beg);
 
     for (auto & pq : tq.patterns)
         if constexpr (debugging >= debugging_DEBUG)
@@ -871,6 +880,15 @@ void PCRSplitter::evaluate_target_primer(pattern_q &pq, const oligo_seq_t &full_
     if constexpr (debugging >= debugging_TRACE+3) seqan3::debug_stream << "\nPrimer: " << pq.primer.name << ": "  << pq.primer.seq <<'\n'  ;
 
     int pr_beg = primer.ref_beg + offset ; //   pr_end = primer.ref_end + offset;
+    
+    if constexpr (debugging >= debugging_VERBOSE)
+    if (pr_beg - (primer.reverse ? primer.len : 0) < 0 ) throw std::runtime_error{"Primer " + primer.name + " is out of the sequence trying to search at position " + std::to_string(pr_beg) 
+        + " with offset " + std::to_string(offset) + "in the sequence of length " + std::to_string(full_target.size())};
+    
+    if constexpr (debugging >= debugging_VERBOSE)
+    if (pr_beg + (primer.reverse ? 0 : primer.len) >= full_target.size()) 
+       throw std::runtime_error{"Primer " + primer.name + " is out of the sequence trying to search at position " + std::to_string(pr_beg) 
+        + " with offset " + std::to_string(offset) + "in the sequence of length " + std::to_string(full_target.size())};
     
     for (int i = 0; i < primer.len; ++i)
     { 
@@ -905,6 +923,10 @@ void PCRSplitter::target_pattern(target_q & tq, const oligo_seq_t &full_target, 
 {
     // already aligned to the reference sequence: just create the target pattern
     tq.target_pattern = std::string(ref_len, '.');
+
+    if (ampl_beg + ref_len > full_target.size()) 
+        throw std::runtime_error{"Amplicon end position is out of the target sequence: " + std::to_string(ampl_beg) + " to " + std::to_string(ampl_beg + ref_len)};
+    if (ampl_beg < 0)    throw std::runtime_error{"Amplicon begin position is out of the target sequence: " + std::to_string(ampl_beg) + " to " + std::to_string(ampl_beg + ref_len)};  
 
     for ( int i = 0; i < ref_len; ++i)
     {
